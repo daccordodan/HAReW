@@ -1,0 +1,24 @@
+# Core (PyTorch-based, per project constraint #1)
+torch>=2.2
+numpy>=1.26,<2.0
+
+# Data handling
+# NOTE: scipy/h5py/osqp intentionally dropped -- no raw-CFR/.mat parsing or
+# Lasso phase-sanitization is needed (project constraint #2: Doppler traces
+# are already computed and pickled). Re-add these only if you later work
+# from raw CFR instead.
+PyYAML>=6.0
+
+# Metrics / analysis
+scikit-learn>=1.4
+matplotlib>=3.8
+seaborn>=0.13
+
+# Dev tooling
+pytest>=8.0
+black>=24.0
+flake8>=7.0
+tqdm>=4.66
+
+# Notebooks (Colab already provides Jupyter; kept for local dev parity)
+jupyter>=1.0

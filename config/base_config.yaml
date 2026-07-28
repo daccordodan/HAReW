@@ -1,0 +1,52 @@
+# Configuration for the BASELINE SHARP reproduction (project phase 1).
+# Extension tasks (phase 2) use their own separate config files:
+#   config/task1_cross_subject.yaml
+#   config/task2_cross_environment.yaml
+#   config/task3_person_id.yaml
+#
+# All values below are sourced from Paper 2 (SHARP methodology) unless
+# noted otherwise. See docs/GLOSSARY_AND_VARIABLES.md for definitions.
+
+project:
+  name: "wifi-har-sharp-baseline"
+  description: "Baseline SHARP reproduction (PyTorch), 5-class task: E, W, R, J, L"
+
+paths:
+  # Local default (also used when running in Colab WITHOUT Drive, e.g. data
+  # uploaded directly to the Colab VM's ephemeral disk).
+  doppler_traces_dir: "data/doppler_traces"
+  baseline_output_dir: "outputs/baseline"
+  # Colab + Drive support (constraint: must run on Colab). Set these to a
+  # path under "My Drive" if you want data/outputs to persist across Colab
+  # runtime restarts; leave null to use the VM's local disk instead.
+  colab_drive_subpath: null        # e.g. "nndl_wifi_har/doppler_traces"
+  colab_drive_output_subpath: null # e.g. "nndl_wifi_har/outputs/baseline"
+
+hardware:
+  n_antennas: 4                # Nant -- Asus RT-AC86U monitor
+
+doppler:
+  # NOTE: no preprocessing config here (lambda, N, noise threshold, etc.)
+  # -- per project constraint, Doppler traces are already computed
+  # upstream. Only the windowing parameters below are used by this project.
+  stacked_vectors_nw: 340       # Nw -- window length fed to the classifier
+  velocity_bins_nd: 100          # ND -- verified against real uploaded files (shape[1]==100)
+  window_stride: null           # null = non-overlapping windows (stride=Nw); set < Nw to oversample short recordings (e.g. jumping)
+
+model:
+  n_classes_primary: 5          # E, W, R, J, L -- see src/data/label_mapping.py
+  dropout_rate: 0.2
+  reference_param_count: 128535  # Paper 2 reported figure, for comparison only (see sharp_classifier.py)
+
+training:
+  batch_size: 16                 # per-window batches; effective batch after antenna-flattening = batch_size * Nant
+  learning_rate: 0.001
+  epochs: 50
+  train_split: 0.6               # of S1 only
+  val_split: 0.2                 # of S1 only (remaining 0.2 = held-out S1 test)
+
+evaluation:
+  test_sets: ["S1", "S2", "S3", "S4", "S5", "S6", "S7"]
+  s7_reference_accuracy: 0.9599  # Paper 2, Table 3
+
+seed: 42

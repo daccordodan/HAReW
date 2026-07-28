@@ -1,0 +1,24 @@
+# Configuration for Task 2: Cross-environment & cross-day robustness,
+# kept fully separate from config/base_config.yaml per project constraint #3.
+
+project:
+  name: "wifi-har-sharp-task2-cross-environment"
+  description: "Domain adaptation to improve S2-S7 generalization beyond the baseline"
+
+paths:
+  doppler_traces_dir: "data/doppler_traces"
+  baseline_checkpoint: "outputs/baseline/checkpoints/sharp_baseline_best.pt"  # starting point only
+  task_output_dir: "outputs/task2_cross_environment"
+  colab_drive_subpath: null
+  colab_drive_output_subpath: null
+
+domain_adaptation:
+  strategy: null                 # TODO: "adversarial" | "batch_norm_recalibration" | "env_augmentation"
+  target_sets: ["S6", "S7"]      # sets to prioritize (largest domain shift per Paper 2 Sec. 6.2)
+
+training:
+  batch_size: 16
+  learning_rate: 0.0001          # smaller LR, assumes fine-tuning from baseline checkpoint
+  epochs: 30
+
+seed: 42

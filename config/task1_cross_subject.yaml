@@ -1,0 +1,27 @@
+# Configuration for Task 1: Cross-subject generalization
+# (contrastive / self-supervised learning), kept fully separate from
+# config/base_config.yaml per project constraint #3.
+
+project:
+  name: "wifi-har-sharp-task1-cross-subject"
+  description: "Contrastive pretraining for subject-invariant Doppler-trace representations"
+
+paths:
+  doppler_traces_dir: "data/doppler_traces"          # same raw data source as baseline
+  baseline_checkpoint: "outputs/baseline/checkpoints/sharp_baseline_best.pt"  # read-only reference, not modified
+  task_output_dir: "outputs/task1_cross_subject"
+  colab_drive_subpath: null
+  colab_drive_output_subpath: null
+
+contrastive:
+  projection_dim: 64             # placeholder -- to be tuned during extension phase
+  temperature: 0.1                # SimCLR-style contrastive temperature (placeholder)
+  augmentations: []                # TODO: define Doppler-trace-appropriate augmentations
+
+training:
+  batch_size: 16
+  learning_rate: 0.0005
+  pretraining_epochs: 100
+  finetune_epochs: 20
+
+seed: 42
