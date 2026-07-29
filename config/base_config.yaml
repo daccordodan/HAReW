@@ -17,7 +17,7 @@ hardware:
 doppler:
   stacked_vectors_nw: 340       # Nw -- window length fed to the classifier
   velocity_bins_nd: 100          # ND -- verified against real uploaded files (shape[1]==100)
-  window_stride: null           # null = non-overlapping windows (stride=Nw); set < Nw to oversample short recordings (e.g. jumping)
+  window_stride: 1           # null = non-overlapping windows (stride=Nw); set < Nw to oversample short recordings (e.g. jumping)
 
 model:
   n_classes_primary: 5          # E, W, R, J, L -- see src/data/label_mapping.py

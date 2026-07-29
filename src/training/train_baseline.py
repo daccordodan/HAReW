@@ -24,6 +24,8 @@ import argparse
 
 import torch
 from torch.utils.data import DataLoader
+#import torch.nn.functional as F
+from src.models.decision_fusion import fuse_batch
 
 from src.data.doppler_trace_dataset import build_train_val_split
 from src.data.label_mapping import TARGET_CLASSES
@@ -41,9 +43,7 @@ def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[tor
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
 
     The single shared SHARPClassifier is trained on every antenna's window
-    as an independent training example (same label repeated Nant times) --
-    this is what "per-antenna classification with shared weights" means in
-    practice for a training loop.
+    as an independent training example.
 
     Args:
         batch_x: Tensor of shape (batch, Nant, Nw, ND).
@@ -58,6 +58,38 @@ def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[tor
     flattened_y = batch_y.unsqueeze(1).expand(batch, n_ant).reshape(batch * n_ant)
     return flattened_x, flattened_y
 
+
+def evaluate_with_fusion(model, val_loader, loss_fn, device):
+    """
+    Evaluates the model using the SHARP Decision Fusion strategy.
+    """
+    model.eval()
+    total_loss = 0.0
+    correct_fused = 0
+    total_samples = 0
+
+    with torch.no_grad():
+        for inputs, targets in val_loader:
+            batch_size, Nant, Nw, ND = inputs.shape
+            inputs_flat = inputs.view(batch_size * Nant, 1, Nw, ND).to(device)
+            targets_flat = targets.repeat_interleave(Nant).to(device)
+
+            logits_flat = model(inputs_flat)
+            loss = loss_fn(logits_flat, targets_flat)
+            total_loss += loss.item()
+
+            probs_flat = F.softmax(logits_flat, dim=1)
+            probs_reshaped = probs_flat.view(batch_size, Nant, -1)
+            fused_preds = fuse_batch(probs_reshaped.cpu(), n_antennas=Nant)
+
+            targets_cpu = targets.cpu()
+            correct_fused += (fused_preds == targets_cpu).sum().item()
+            total_samples += batch_size
+
+    avg_loss = total_loss / len(val_loader)
+    fused_acc = correct_fused / total_samples
+    
+    return avg_loss, fused_acc
 
 def run_epoch(
     model: torch.nn.Module,
@@ -118,17 +150,10 @@ def main(config_path: str) -> None:
     logger.info("Using device: %s", device)
 
     data_root = Path(config["paths"]["doppler_traces_dir"])
-    '''data_root = get_data_root(
-        local_default=config["paths"]["doppler_traces_dir"],
-        drive_subpath=config["paths"].get("colab_drive_subpath"),
-    )'''
+
     output_root=Path(config["paths"]["baseline_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
-    
-    '''output_root = get_output_root(
-        local_default=config["paths"]["baseline_output_dir"],
-        drive_subpath=config["paths"].get("colab_drive_output_subpath"),
-    )'''
+
     checkpoints_dir = output_root / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
@@ -158,7 +183,8 @@ def main(config_path: str) -> None:
     best_val_acc = 0.0
     for epoch in range(1, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
-        val_loss, val_acc = run_epoch(model, val_loader, loss_fn, device, optimizer=None)
+        val_loss, val_acc = evaluate_with_fusion(model, val_loader, loss_fn, device)
+        #val_loss, val_acc = run_epoch(model, val_loader, loss_fn, device, optimizer=None)
         logger.info(
             "Epoch %d/%d | train_loss=%.4f train_acc=%.4f | val_loss=%.4f val_acc=%.4f",
             epoch, config["training"]["epochs"], train_loss, train_acc, val_loss, val_acc,
