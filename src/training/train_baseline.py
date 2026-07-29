@@ -32,6 +32,7 @@ from src.training.losses import build_loss_fn
 from src.utils.colab_utils import get_data_root, get_device, get_output_root
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
+from pathlib import Path
 
 logger = get_logger(__name__)
 
@@ -116,14 +117,18 @@ def main(config_path: str) -> None:
     device = get_device()
     logger.info("Using device: %s", device)
 
-    data_root = get_data_root(
+    data_root = Path(config["paths"]["doppler_traces_dir"])
+    '''data_root = get_data_root(
         local_default=config["paths"]["doppler_traces_dir"],
         drive_subpath=config["paths"].get("colab_drive_subpath"),
-    )
-    output_root = get_output_root(
+    )'''
+    output_root=Path(config["paths"]["baseline_output_dir"])
+    output_root.mkdir(parents=True, exist_ok=True)
+    
+    '''output_root = get_output_root(
         local_default=config["paths"]["baseline_output_dir"],
         drive_subpath=config["paths"].get("colab_drive_output_subpath"),
-    )
+    )'''
     checkpoints_dir = output_root / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
 
