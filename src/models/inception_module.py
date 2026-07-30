@@ -119,10 +119,6 @@ class SimplifiedInceptionModule(nn.Module):
         self.branch_c = nn.Sequential(
             nn.MaxPool2d(kernel_size=2, stride=2),#, padding=1),
         )
-        self.out_branch = nn.Sequential(
-            nn.Conv2d(15, 3, kernel_size=1, stride=1),
-            nn.ReLU(inplace=True),
-        )
 
     @property
     def out_channels(self) -> int:
@@ -143,5 +139,4 @@ class SimplifiedInceptionModule(nn.Module):
         a = self.branch_a(x)
         b = self.branch_b(x)
         c = self.branch_c(x)
-        d = torch.cat([a, b, c], dim=1)
-        return self.out_branch(d)
+        return torch.cat([a, b, c], dim=1)
