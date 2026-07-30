@@ -2,16 +2,33 @@
 
 Source: Paper 2, Sec. 4.1 + Fig. 4.
 
-Pipeline: SimplifiedInceptionModule -> 1x1 conv reduction (15 -> 3 feature
-maps) -> Flatten -> Dropout(0.2) -> Dense(n_classes) -> activity vector
-(raw logits; apply softmax only where probabilities are needed, since the
-training loop uses nn.CrossEntropyLoss which expects logits directly).
+Pipeline: SimplifiedInceptionModule (branches internally halve Nw x ND ->
+Nw/2 x ND/2, then concatenate to 15 channels) -> 1x1 conv reduction
+(15 -> 3 feature maps, at Nw/2 x ND/2) -> Flatten -> Dropout(0.2) ->
+Dense(n_classes) -> activity vector (raw logits; apply softmax only where
+probabilities are needed, since the training loop uses nn.CrossEntropyLoss
+which expects logits directly).
+
+ARCHITECTURE CORRECTION: an earlier version of this file applied the 1x1
+reduction at FULL resolution (Nw x ND) and only downsampled afterward via a
+separate max-pool. Paper 2, Sec. 4.1 explicitly states each Inception
+branch's output is already an "Nw/2 x ND/2 dimensional feature map" -- i.e.
+the downsampling happens inside the branches (see inception_module.py),
+and the 1x1 reduction operates on those already-halved, concatenated
+feature maps directly. Fixed here; the separate spatial_pool step is
+removed since SimplifiedInceptionModule now produces Nw/2 x ND/2 output on
+its own. Final flattened size (and therefore parameter count) is
+unchanged by this fix -- convolution/pooling stride affects output spatial
+size, not layer parameter count -- so the paper-comparison validation
+below still holds.
 
 Paper-reported total parameters (single-antenna classifier, 5-class task):
 128,535. This implementation's exact count will differ slightly since the
 paper does not publish full layer hyperparameters (see inception_module.py
-docstring) -- use count_parameters() to compare against the reference and
-tune branch_channels/dense width if you need a closer match.
+docstring, including the note on unverified per-branch feature-map counts)
+-- use count_parameters() to compare against the reference, and adjust
+BRANCH_CHANNELS_A/B/C in inception_module.py directly if you need a closer
+match once the true per-branch split is confirmed.
 
 Primary task: 5-class (walking, running, jumping, sitting + empty room) --
 resolved for this project as label_mapping.TARGET_CLASSES = [E, W, R, J, L].
@@ -40,8 +57,10 @@ class SHARPClassifier(nn.Module):
     """Single-antenna SHARP activity classifier.
 
     Attributes:
-        feature_extractor: SimplifiedInceptionModule instance.
-        reduction_conv: 1x1 conv reducing branch-concatenated channels -> 3.
+        feature_extractor: SimplifiedInceptionModule instance (internally
+            halves Nw x ND to Nw/2 x ND/2 within each branch).
+        reduction_conv: 1x1 conv reducing branch-concatenated channels -> 3,
+            applied at the already-halved Nw/2 x ND/2 resolution.
         dropout: Dropout layer (rate=0.2).
         classifier_head: Final dense layer producing the activity vector (logits).
     """
@@ -51,7 +70,6 @@ class SHARPClassifier(nn.Module):
         n_classes: int = N_CLASSES_PRIMARY,
         nw: int = DEFAULT_NW,
         nd: int = DEFAULT_ND,
-        branch_channels: int = 5,
         reduced_channels: int = 3,
         dropout_rate: float = DROPOUT_RATE,
     ) -> None:
@@ -62,24 +80,21 @@ class SHARPClassifier(nn.Module):
                 baseline; pass N_CLASSES_EXTENDED for the future 8-class task).
             nw: Nw, input Doppler trace time dimension (default 340).
             nd: ND, input Doppler trace velocity-bin dimension (default 100).
-            branch_channels: Channels per Inception branch (see inception_module.py).
             reduced_channels: Output channels of the 1x1 reduction conv
                 (paper: 15 -> 3, so default 3).
             dropout_rate: Dropout probability before the final dense layer.
         """
         super().__init__()
-        self.feature_extractor = SimplifiedInceptionModule(in_channels=1, branch_channels=branch_channels)
+        self.feature_extractor = SimplifiedInceptionModule(in_channels=1)
         self.reduction_conv = nn.Conv2d(self.feature_extractor.out_channels, reduced_channels, kernel_size=1)
         self.relu = nn.ReLU(inplace=True)
-        # A flatten straight from (reduced_channels, Nw, ND) with Nw=340,
-        # ND=100 would blow the dense layer out to ~500K+ params (>>the
-        # paper's reported 128,535 total). A 2x2 max-pool here is the
-        # missing spatial-downsampling step needed to land close to that
-        # budget -- verified analytically: with reduced_channels=3 and this
-        # pool, total params = 128,443 vs. the paper's 128,535 (99.9% match).
-        self.spatial_pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        pooled_nw, pooled_nd = nw // 2, nd // 2
         self.dropout = nn.Dropout(p=dropout_rate)
+        # SimplifiedInceptionModule's branches already halve Nw x ND to
+        # Nw/2 x ND/2 internally (via stride-2 layers) -- the reduction
+        # conv above operates directly on that half-resolution output, so
+        # the dense layer's input size is computed at half resolution, with
+        # no separate pooling step needed here.
+        pooled_nw, pooled_nd = nw // 2, nd // 2
         self.classifier_head = nn.Linear(reduced_channels * pooled_nw * pooled_nd, n_classes)
 
     def forward(self, doppler_trace: torch.Tensor) -> torch.Tensor:
@@ -94,10 +109,9 @@ class SHARPClassifier(nn.Module):
         Returns:
             Raw logits of shape (batch, n_classes).
         """
-        features = self.feature_extractor(doppler_trace)
-        reduced = self.relu(self.reduction_conv(features))
-        pooled = self.spatial_pool(reduced)
-        flattened = torch.flatten(pooled, start_dim=1)
+        features = self.feature_extractor(doppler_trace)  # (batch, 15, Nw/2, ND/2)
+        reduced = self.relu(self.reduction_conv(features))  # (batch, 3, Nw/2, ND/2)
+        flattened = torch.flatten(reduced, start_dim=1)
         dropped = self.dropout(flattened)
         return self.classifier_head(dropped)
 
