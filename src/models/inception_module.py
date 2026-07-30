@@ -60,13 +60,13 @@ from torch import nn
 # Per-branch feature-map counts (the "N" in the paper's "N@(ixi)" notation).
 # UNVERIFIED SPLIT -- see module docstring above. Must sum to 15 to match
 # the paper's stated total (that total IS verified from the paper's prose).
-BRANCH_CHANNELS_A = 3  # 1x1 -> 3x3 conv branch
+BRANCH_CHANNELS_A = 9  # 1x1 -> 3x3 conv branch
 BRANCH_CHANNELS_B = 5  # 1x1 -> 5x5 conv branch
-BRANCH_CHANNELS_C = 5  # maxpool -> 1x1 conv branch
-'''assert BRANCH_CHANNELS_A + BRANCH_CHANNELS_B + BRANCH_CHANNELS_C == 15, (
+BRANCH_CHANNELS_C = 1  # maxpool -> 1x1 conv branch
+assert BRANCH_CHANNELS_A + BRANCH_CHANNELS_B + BRANCH_CHANNELS_C == 15, (
     "Per-branch feature-map counts must sum to 15 -- the one figure detail "
     "confirmed directly from the paper's prose (Sec. 4.1)."
-)'''
+)
 
 
 class SimplifiedInceptionModule(nn.Module):
