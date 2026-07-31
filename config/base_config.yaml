@@ -25,7 +25,7 @@ model:
   reference_param_count: 128535
 
 training:
-  batch_size: 16                 # per-window batches; effective batch after antenna-flattening = batch_size * Nant
+  batch_size: 16                 # per-window batches
   learning_rate: 0.001
   epochs: 50
   train_split: 0.6               # of S1 only

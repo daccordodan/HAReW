@@ -1,21 +1,4 @@
 """Baseline SHARP reproduction: training loop.
-
-This is the FIRST project deliverable (per project owner's constraint #3):
-reproduce the base SHARP architecture faithfully before any of the three
-extension tasks are touched. Extension tasks live in separate
-train_task{1,2,3}_*.py files with their own configs -- nothing in this file
-should be imported by or share state with those.
-
-Source: Paper 2, Sec. 6.1 (Experimental Setup) -- training/validation drawn
-EXCLUSIVELY from set S1 (60% train, 20% val); the remaining 20% of S1 plus
-ALL of S2-S7 are reserved for zero-shot evaluation (see
-src/training/evaluate_baseline.py -- not this file).
-
-Per-antenna classifiers are trained independently (Nant=4 separate forward
-passes per sample) and share the SAME SHARPClassifier weights across
-antennas -- Paper 2 does not train 4 independent networks; a single
-classifier is applied per-antenna, and only the *predictions* (not the
-weights) are fused at inference time (see src/models/decision_fusion.py).
 """
 
 from __future__ import annotations
@@ -31,7 +14,7 @@ from src.data.doppler_trace_dataset import build_train_val_split
 from src.data.label_mapping import TARGET_CLASSES
 from src.models.sharp_classifier import SHARPClassifier
 from src.training.losses import build_loss_fn
-from src.utils.colab_utils import get_data_root, get_device, get_output_root
+from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from pathlib import Path
@@ -50,8 +33,7 @@ def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[tor
         batch_y: Tensor of shape (batch,).
 
     Returns:
-        (flattened_x, flattened_y): flattened_x has shape
-        (batch*Nant, 1, Nw, ND); flattened_y has shape (batch*Nant,).
+        (flattened_x, flattened_y)
     """
     batch, n_ant, nw, nd = batch_x.shape
     flattened_x = batch_x.reshape(batch * n_ant, 1, nw, nd)
@@ -61,7 +43,7 @@ def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[tor
 
 def evaluate_with_fusion(model, val_loader, loss_fn, device):
     """
-    Evaluates the model using the SHARP Decision Fusion strategy.
+    Evaluates the model using the SHARP Decision strategy.
     """
     model.eval()
     total_loss = 0.0
@@ -98,24 +80,22 @@ def run_epoch(
     device: str,
     optimizer: torch.optim.Optimizer | None = None,
 ) -> tuple[float, float]:
-    """Runs one epoch of training (if optimizer given) or evaluation (if None).
+    """Runs one epoch of training or evaluation.
 
     Args:
-        model: SHARPClassifier instance.
+        model: SHARPClassifier.
         dataloader: Yields (batch_x, batch_y) with batch_x shape (batch, Nant, Nw, ND).
         loss_fn: Cross-entropy loss instance.
         device: "cuda" or "cpu".
-        optimizer: If provided, runs backward()+step() (training mode).
-            If None, runs in eval/no-grad mode (validation).
+        optimizer: runs backward()+step().
 
     Returns:
         (mean_loss, accuracy) for the epoch.
     """
-    is_training = optimizer is not None
-    model.train() if is_training else model.eval()
+    model.train()
 
     total_loss, total_correct, total_count = 0.0, 0, 0
-    context = torch.enable_grad() if is_training else torch.no_grad()
+    context = torch.enable_grad()
 
     with context:
         for batch_x, batch_y in dataloader:
@@ -125,10 +105,9 @@ def run_epoch(
             logits = model(flattened_x)
             loss = loss_fn(logits, flattened_y)
 
-            if is_training:
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
             total_loss += loss.item() * flattened_y.size(0)
             total_correct += (logits.argmax(dim=1) == flattened_y).sum().item()
@@ -160,9 +139,6 @@ def main(config_path: str) -> None:
         data_root,
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
-        #train_frac=config["training"]["train_split"],
-        #val_frac=config["training"]["val_split"],
-        #seed=config["seed"],
     )
     logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
 
@@ -183,7 +159,6 @@ def main(config_path: str) -> None:
     for epoch in range(1, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
         val_loss, val_acc = evaluate_with_fusion(model, val_loader, loss_fn, device)
-        #val_loss, val_acc = run_epoch(model, val_loader, loss_fn, device, optimizer=None)
         logger.info(
             "Epoch %d/%d | train_loss=%.4f train_acc=%.4f | val_loss=%.4f val_acc=%.4f",
             epoch, config["training"]["epochs"], train_loss, train_acc, val_loss, val_acc,
