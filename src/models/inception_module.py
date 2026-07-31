@@ -109,7 +109,7 @@ class SimplifiedInceptionModule(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(3, 6, kernel_size=2),
             nn.ReLU(inplace=True),
-            nn.Conv2d(6, 9, kernel_size=4, stride=2),
+            nn.Conv2d(6, 9, kernel_size=4, stride=2, padding=2),
             nn.ReLU(inplace=True),
         )
         self.branch_b = nn.Sequential(
@@ -117,7 +117,7 @@ class SimplifiedInceptionModule(nn.Module):
             nn.ReLU(inplace=True),
         )
         self.branch_c = nn.Sequential(
-            nn.MaxPool2d(kernel_size=2, stride=2),#, padding=1),
+            nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
     @property

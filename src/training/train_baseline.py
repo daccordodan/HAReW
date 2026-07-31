@@ -25,6 +25,7 @@ import argparse
 import torch
 from torch.utils.data import DataLoader
 from src.models.decision_fusion import fuse_batch
+from torch.nn.functional import softmax as softmax
 
 from src.data.doppler_trace_dataset import build_train_val_split
 from src.data.label_mapping import TARGET_CLASSES
@@ -77,7 +78,7 @@ def evaluate_with_fusion(model, val_loader, loss_fn, device):
             loss = loss_fn(logits_flat, targets_flat)
             total_loss += loss.item()
 
-            probs_flat = F.softmax(logits_flat, dim=1)
+            probs_flat = softmax(logits_flat, dim=1)
             probs_reshaped = probs_flat.view(batch_size, Nant, -1)
             fused_preds = fuse_batch(probs_reshaped.cpu(), n_antennas=Nant)
 
