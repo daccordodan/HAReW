@@ -159,9 +159,9 @@ def main(config_path: str) -> None:
         data_root,
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
-        train_frac=config["training"]["train_split"],
-        val_frac=config["training"]["val_split"],
-        seed=config["seed"],
+        #train_frac=config["training"]["train_split"],
+        #val_frac=config["training"]["val_split"],
+        #seed=config["seed"],
     )
     logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
 

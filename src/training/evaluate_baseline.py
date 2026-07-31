@@ -100,9 +100,9 @@ def main(config_path: str, checkpoint_path: str) -> None:
         data_root,
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
-        train_frac=config["training"]["train_split"],
-        val_frac=config["training"]["val_split"],
-        seed=config["seed"],
+        #train_frac=config["training"]["train_split"],
+        #val_frac=config["training"]["val_split"],
+        #seed=config["seed"],
     )
     s1_loader = DataLoader(s1_test_subset, batch_size=config["training"]["batch_size"], shuffle=False)
     y_true, y_pred = evaluate_set(model, s1_loader, device)
