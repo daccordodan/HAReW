@@ -24,7 +24,6 @@ import argparse
 
 import torch
 from torch.utils.data import DataLoader
-#import torch.nn.functional as F
 from src.models.decision_fusion import fuse_batch
 
 from src.data.doppler_trace_dataset import build_train_val_split
@@ -150,7 +149,6 @@ def main(config_path: str) -> None:
     logger.info("Using device: %s", device)
 
     data_root = Path(config["paths"]["doppler_traces_dir"])
-
     output_root=Path(config["paths"]["baseline_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
 

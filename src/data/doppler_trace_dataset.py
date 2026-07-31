@@ -169,6 +169,7 @@ class DopplerTraceDataset(Dataset):
         window_size: int = DEFAULT_NW,
         stride: int | None = None,
         n_antennas: int = DEFAULT_NANT,
+        temporal_split: Literal["train", "val", "test", "all"] = "all",
     ) -> None:
         """Indexes and windows all in-scope samples for the requested sets.
 
@@ -190,9 +191,14 @@ class DopplerTraceDataset(Dataset):
         self.window_size = window_size
         self.stride = stride or window_size
         self.n_antennas = n_antennas
+        self.temporal_split = temporal_split
 
-        self._samples: list[torch.Tensor] = []
-        self._labels: list[int] = []
+        self._recordings: list[np.ndarray] = []
+        self._window_indices: list[tuple[int, int, int]] = []  # (recording_idx, start_time, label)
+
+        #self._samples: list[torch.Tensor] = []
+        #self._labels: list[int] = []
+
         self._meta: list[dict] = []
         self._excluded_counts: dict[str, int] = {}
         self._corrupt_files: list[str] = []
@@ -242,7 +248,7 @@ class DopplerTraceDataset(Dataset):
             # timeline length; trim to the shortest just in case of a
             # trailing-sample mismatch between antennas.
             min_len = min(s.shape[0] for s in per_antenna_streams)
-            per_antenna_streams = [s[:min_len] for s in per_antenna_streams]
+            '''per_antenna_streams = [s[:min_len] for s in per_antenna_streams]
 
             per_antenna_windows = [
                 _window_stream(s, self.window_size, self.stride) for s in per_antenna_streams
@@ -251,24 +257,69 @@ class DopplerTraceDataset(Dataset):
             if n_windows == 0:
                 continue
 
+            class_idx = raw_to_class_index(activity_code)'''
+
+            if self.temporal_split != "all":
+                gap = self.window_size 
+
+                train_end = int(min_len * 0.6)
+                val_start = train_end + gap
+                val_end = val_start + int(min_len * 0.2)
+                test_start = val_end + gap
+
+                if self.temporal_split == "train":
+                    start_idx, end_idx = 0, train_end
+                elif self.temporal_split == "val":
+                    start_idx, end_idx = val_start, val_end
+                elif self.temporal_split == "test":
+                    start_idx, end_idx = test_start, min_len
+            else:
+                start_idx, end_idx = 0, min_len
+
+            slice_len = end_idx - start_idx
+            if slice_len < self.window_size:
+                continue
+
+            #if min_len < self.window_size:
+                #continue  # Skip if the recording is too short for even one window
+
+            # Stack into one array of shape (Nant, n_time_steps, ND) and keep in RAM
+            per_antenna_streams = [s[start_idx:end_idx] for s in per_antenna_streams]
+
+            stacked_recording = np.stack([s[:min_len] for s in per_antenna_streams], axis=0)
+            rec_idx = len(self._recordings)
+            self._recordings.append(stacked_recording)
+
             class_idx = raw_to_class_index(activity_code)
+            
+            # Calculate how many valid windows can be extracted
+            n_windows = 1 + (slice_len - self.window_size) // self.stride
+            #n_windows = 1 + (min_len - self.window_size) // self.stride
+
             for w in range(n_windows):
-                stacked = np.stack(
+                '''stacked = np.stack(
                     [per_antenna_windows[a][w] for a in range(self.n_antennas)], axis=0
                 )  # shape (Nant, Nw, ND)
                 self._samples.append(torch.from_numpy(stacked).float())
-                self._labels.append(class_idx)
+                self._labels.append(class_idx)'''
+
+                start_time = w * self.stride
+                
+                # Only save the coordinates, not the actual array data!
+                self._window_indices.append((rec_idx, start_time, class_idx))
                 self._meta.append(
                     {
                         "set_id": set_id,
                         "repetition": repetition,
                         "activity_code": activity_code,
                         "window_idx": w,
+                        "split": self.temporal_split,
                     }
                 )
 
     def __len__(self) -> int:
-        return len(self._samples)
+        #return len(self._samples)
+        return len(self._window_indices)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         """Returns (doppler_trace, label).
@@ -280,7 +331,14 @@ class DopplerTraceDataset(Dataset):
             doppler_trace: FloatTensor of shape (Nant, Nw, ND).
             label: Integer target class index (see label_mapping.TARGET_CLASSES).
         """
-        return self._samples[idx], self._labels[idx]
+        rec_idx, start_time, label = self._window_indices[idx]
+        end_time = start_time + self.window_size
+
+        # Slice the window out of the pre-loaded recording on the fly
+        # window shape: (Nant, Nw, ND)
+        window = self._recordings[rec_idx][:, start_time:end_time, :]
+        #return self._samples[idx], self._labels[idx]
+        return torch.tensor(window, dtype=torch.float32), label
 
     def summary(self) -> dict:
         """Returns a small report of included/excluded/corrupt counts, for sanity checks."""
@@ -297,9 +355,9 @@ def build_train_val_split(
     root_dir: str | Path,
     window_size: int = DEFAULT_NW,
     stride: int | None = None,
-    train_frac: float = 0.6,
-    val_frac: float = 0.2,
-    seed: int = 42,
+    #train_frac: float = 0.6,
+    #val_frac: float = 0.2,
+    #seed: int = 42,
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
     """Builds the S1-only train/val/(held-out) test split, per Paper 2 Sec. 6.1.
 
@@ -315,8 +373,11 @@ def build_train_val_split(
     Returns:
         (full_s1_dataset, train_subset, val_subset, s1_test_subset).
     """
-    s1_dataset = DopplerTraceDataset(
-        root_dir, sets_to_include=(TRAIN_ONLY_SET,), window_size=window_size, stride=stride
+    '''s1_dataset = DopplerTraceDataset(
+        root_dir, 
+        sets_to_include=(TRAIN_ONLY_SET,), 
+        window_size=window_size, 
+        stride=stride
     )
     n = len(s1_dataset)
     generator = torch.Generator().manual_seed(seed)
@@ -332,6 +393,42 @@ def build_train_val_split(
     train_subset = torch.utils.data.Subset(s1_dataset, train_idx)
     val_subset = torch.utils.data.Subset(s1_dataset, val_idx)
     test_subset = torch.utils.data.Subset(s1_dataset, test_idx)
+    return s1_dataset, train_subset, val_subset, test_subset'''
+
+    train_dataset = DopplerTraceDataset(
+        root_dir, 
+        sets_to_include=(TRAIN_ONLY_SET,), 
+        window_size=window_size, 
+        stride=stride,
+        temporal_split="train"
+    )
+    val_dataset = DopplerTraceDataset(
+        root_dir, 
+        sets_to_include=(TRAIN_ONLY_SET,), 
+        window_size=window_size, 
+        stride=stride,
+        temporal_split="train"
+    )
+    test_dataset = DopplerTraceDataset(
+        root_dir, 
+        sets_to_include=(TRAIN_ONLY_SET,), 
+        window_size=window_size, 
+        stride=stride,
+        temporal_split="train"
+    )
+
+    train_subset = torch.utils.data.Subset(train_dataset, range(len(train_dataset)))
+    val_subset = torch.utils.data.Subset(val_dataset, range(len(val_dataset)))
+    test_subset = torch.utils.data.Subset(test_dataset, range(len(test_dataset)))
+
+    s1_dataset = DopplerTraceDataset(
+        root_dir, 
+        sets_to_include=(TRAIN_ONLY_SET,), 
+        window_size=window_size, 
+        stride=stride, 
+        temporal_split="all"
+    )
+
     return s1_dataset, train_subset, val_subset, test_subset
 
 
