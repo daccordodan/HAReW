@@ -18,6 +18,7 @@ from typing import Literal
 
 import numpy as np
 import torch
+import os, os.path
 from torch.utils.data import Dataset
 
 from src.data.label_mapping import is_in_scope, raw_to_class_index
@@ -60,6 +61,8 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
     Returns:
         List of StreamFileInfo for every recognized file.
     """
+
+    '''
     root = Path(root_dir)
     infos = []
 
@@ -79,7 +82,9 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
             infos.append(info)
 
     print(infos)
-    wait = input("premi un tasto")
+    '''
+
+    infos=len([name for name in os.listdir('.') if os.path.isfile(name)])
     return infos
 
 
