@@ -62,6 +62,10 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
     """
     root = Path(root_dir)
     infos = []
+
+    print(len(root.rglob("*.txt")))
+    print(len(sorted(root.rglob("*.txt"))))
+
     for txt_path in sorted(root.rglob("*.txt")):
         match = _FILENAME_RE.match(txt_path.name)
         if match is not None:
@@ -73,6 +77,9 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
                 antenna_idx=int(match.group("antenna")),
             )
             infos.append(info)
+
+    print(infos)
+    wait = input("premi un tasto")
     return infos
 
 
@@ -135,7 +142,19 @@ class DopplerTraceDataset(Dataset):
         self._build_index()
 
     def _build_index(self) -> None:
-        all_files = discover_stream_files(self.root_dir)
+        root = Path(self.root_dir)
+        all_files = []
+        for txt_path in sorted(root.rglob("*.txt")):
+            match = _FILENAME_RE.match(txt_path.name)
+            if match is not None:
+                info = StreamFileInfo(
+                    path=txt_path,
+                    set_id=match.group("set_num"),
+                    repetition=match.group("letter"),
+                    activity_code=match.group("activity"),
+                    antenna_idx=int(match.group("antenna")),
+                )
+                all_files.append(info)
 
         groups: dict[tuple[str, str, str], dict[int, Path]] = {} # This was to group files by (set_id, repetition, activity_code) -> {antenna_idx: path}
         for info in all_files:

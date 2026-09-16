@@ -22,3 +22,6 @@ tqdm>=4.66
 
 # Notebooks (Colab already provides Jupyter; kept for local dev parity)
 jupyter>=1.0
+
+# Hugging Face
+huggingface_hub

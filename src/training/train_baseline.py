@@ -18,9 +18,10 @@ from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from pathlib import Path
+from huggingface_hub import HfApi, hf_hub_download
 
 logger = get_logger(__name__)
-
+api = HfApi()
 
 def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
@@ -155,8 +156,21 @@ def main(config_path: str) -> None:
     loss_fn = build_loss_fn(n_classes=len(TARGET_CLASSES))
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
-    best_val_acc = 0.0
-    for epoch in range(1, config["training"]["epochs"] + 1):
+    checkpoint=torch.load(hf_hub_download(
+        repo_id="danieledaccordo/HAReW",
+        filename="checkpoints_dir/sharp_baseline_best.pt",
+        repo_type="model"
+    ))
+    if checkpoint:
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch=checkpoint['epoch']+1
+        best_val_acc=checkpoint['val_acc']
+    else:
+        start_epoch=0
+        best_val_acc = 0.0
+        
+    for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
         val_loss, val_acc = evaluate_with_fusion(model, val_loader, loss_fn, device)
         logger.info(
@@ -170,13 +184,22 @@ def main(config_path: str) -> None:
             torch.save(
                 {
                     "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
                     "config": config,
                     "epoch": epoch,
                     "class_names": list(TARGET_CLASSES),
+                    "val_acc" : val_acc,
                 },
                 checkpoint_path,
             )
             logger.info("Saved new best checkpoint (val_acc=%.4f) -> %s", val_acc, checkpoint_path)
+            api.upload_file(
+                path_or_fileobj=checkpoint_path,
+                path_in_repo="checkpoints_dir/sharp_baseline_best.pt",
+                repo_id="danieledaccordo/HAReW",
+                repo_type="model"
+            )
+            logger.info("Uploaded new best checkpoint to Hugging Face")
 
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
 
