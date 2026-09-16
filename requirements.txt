@@ -1,6 +1,6 @@
 # Core (PyTorch-based, per project constraint #1)
 torch>=2.2
-numpy>=2.0,<2.1
+numpy>=2.0
 
 # Data handling
 # NOTE: scipy/h5py/osqp intentionally dropped -- no raw-CFR/.mat parsing or
