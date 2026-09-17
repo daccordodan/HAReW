@@ -215,7 +215,7 @@ def main(config_path: str) -> None:
         history["val_acc"].append(val_acc)
 
         train_line.set_data(history["epoch"],history["train_loss"])
-        val_loss.set_data(history["epoch"],history["val_loss"])
+        val_line.set_data(history["epoch"],history["val_loss"])
         ax.relim()
         ax.autoscale_view()
         display_handle.update(fig)
