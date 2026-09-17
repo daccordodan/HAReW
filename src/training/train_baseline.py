@@ -23,26 +23,27 @@ from huggingface_hub import HfApi, hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
 
 import matplotlib.pyplot as plt
+import ipywidgets as widgets
 from IPython.display import clear_output, display
 
 logger = get_logger(__name__)
 api = HfApi()
-plt.ion()
+chart_output=widgets.Output()
+display(chart_output)
 
 def setup_error_plot():
     fig, ax = plt.subplots(figsize=(8,5))
     (train_line,) = ax.plot([],[],label="Train loss", color="blue", marker="o")
-    (val_line,) = ax.plot([],[],label="Val loss", color="blue", marker="o")
+    (val_line,) = ax.plot([],[],label="Val loss", color="red", marker="o")
 
     ax.set_title("Training and validation loss over epochs")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
     ax.legend()
     ax.grid(True)
+    plt.close(fig)
 
-    display_handle=display(fig, display_id=True)
-
-    return [fig, ax, train_line, val_line, display_handle]
+    return [fig, ax, train_line, val_line]
 
 def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
@@ -218,7 +219,9 @@ def main(config_path: str) -> None:
         val_line.set_data(history["epoch"],history["val_loss"])
         ax.relim()
         ax.autoscale_view()
-        display_handle.update(fig)
+        with chart_output:
+            chart_output.clear_output(wait=True)
+            display(fig)
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
