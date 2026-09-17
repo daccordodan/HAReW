@@ -58,9 +58,9 @@ def fuse_predictions(
     """
     per_antenna_predictions = torch.argmax(per_antenna_activity_vectors, dim=1).tolist()
     majority_result = majority_vote_fusion(per_antenna_predictions, n_antennas)
-    if majority_result is not None:
-        return majority_result
-    return summed_vector_fusion(per_antenna_activity_vectors)
+    if majority_result is None:
+        return summed_vector_fusion(per_antenna_activity_vectors)
+    return majority_result
 
 
 def fuse_batch(batch_activity_vectors: torch.Tensor, n_antennas: int = DEFAULT_N_ANTENNAS) -> torch.Tensor:

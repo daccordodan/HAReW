@@ -17,6 +17,9 @@ from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 
+from huggingface_hub import hf_hub_download
+
+
 logger = get_logger(__name__)
 
 S7_REFERENCE_ACCURACY = 0.9599 # For comparison with the paper
@@ -59,8 +62,8 @@ def main(config_path: str, checkpoint_path: str) -> None:
         config_path: Path to configs.
         checkpoint_path: Path to a checkpoint saved by train_baseline.py.
     """
-    config = load_config(config_path)
     device = get_device()
+    config = load_config(config_path)
 
     data_root=config["paths"]["doppler_traces_dir"]
     output_root=config["paths"]["baseline_output_dir"]
@@ -70,7 +73,11 @@ def main(config_path: str, checkpoint_path: str) -> None:
         nw=config["doppler"]["stacked_vectors_nw"],
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(hf_hub_download(
+        repo_id="danieledaccordo/HAReW",
+        filename="checkpoints_dir/sharp_baseline_best.pt",
+        repo_type="model"
+    ), map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     logger.info("Loaded checkpoint from epoch %d", checkpoint.get("epoch", -1))
 

@@ -255,6 +255,7 @@ class DopplerTraceDataset(Dataset):
 
 def build_train_val_split(
     root_dir: str | Path,
+    set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"] = TRAIN_ONLY_SET,
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
@@ -271,24 +272,24 @@ def build_train_val_split(
 
     train_dataset = DopplerTraceDataset(
         root_dir, 
-        sets_to_include=(TRAIN_ONLY_SET,), 
+        sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
         temporal_split="train"
     )
     val_dataset = DopplerTraceDataset(
         root_dir, 
-        sets_to_include=(TRAIN_ONLY_SET,), 
+        sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="train"
+        temporal_split="val"
     )
     test_dataset = DopplerTraceDataset(
         root_dir, 
-        sets_to_include=(TRAIN_ONLY_SET,), 
+        sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="train"
+        temporal_split="test"
     )
 
     train_subset = torch.utils.data.Subset(train_dataset, range(len(train_dataset)))
@@ -297,10 +298,9 @@ def build_train_val_split(
 
     full_dataset = DopplerTraceDataset(
         root_dir, 
-        sets_to_include=(TRAIN_ONLY_SET,), 
+        sets_to_include=(set_id,), 
         window_size=window_size, 
-        stride=stride, 
-        temporal_split="all"
+        stride=stride
     )
 
     return full_dataset, train_subset, val_subset, test_subset
@@ -308,7 +308,7 @@ def build_train_val_split(
 
 def build_zero_shot_test_set(
     root_dir: str | Path,
-    set_id: Literal["S2", "S3", "S4", "S5", "S6", "S7"],
+    set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
 ) -> DopplerTraceDataset:

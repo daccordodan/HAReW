@@ -17,6 +17,7 @@ from src.training.losses import build_loss_fn
 from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
+from src.training.evaluate_baseline import main as evaluation_main
 
 from pathlib import Path
 from huggingface_hub import HfApi, hf_hub_download
@@ -127,59 +128,30 @@ def main(config_path: str) -> None:
     Args:
         config_path: Path to config/base_config.yaml.
     """
-    config = load_config(config_path)
     device = get_device()
+    config = load_config(config_path)
 
-    history = {
-        "epoch": [],
-        "train_loss": [],
-        "val_loss": [],
-        "val_acc": []
-    }
-
-    data_root = Path(config["paths"]["doppler_traces_dir"])
     output_root=Path(config["paths"]["baseline_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
 
     checkpoints_dir = output_root / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
-
-    _, train_subset, val_subset, _ = build_train_val_split(
-        data_root,
-        window_size=config["doppler"]["stacked_vectors_nw"],
-        stride=config["doppler"].get("window_stride"),
-    )
-    logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
-
-    train_loader = DataLoader(train_subset, batch_size=config["training"]["batch_size"], shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=config["training"]["batch_size"], shuffle=False)
+    checkpoint_path = checkpoints_dir / "sharp_baseline_best.pt"
 
     model = SHARPClassifier(
         n_classes=len(TARGET_CLASSES),
         nw=config["doppler"]["stacked_vectors_nw"],
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
-    logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
-
     loss_fn = build_loss_fn(n_classes=len(TARGET_CLASSES))
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
-    try:
-        checkpoint=torch.load(hf_hub_download(
-            repo_id="danieledaccordo/HAReW",
-            filename="checkpoints_dir/sharp_baseline_best.pt",
-            repo_type="model"
-        ))
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch=checkpoint["epoch"]+1
-        best_val_acc=checkpoint["val_acc"]
-        history=checkpoint["history"]
-    except EntryNotFoundError:
-        start_epoch=0
-        best_val_acc = 0.0
+    logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
-        
+    train_loader,val_loader=get_data_loaders(config)
+    start_epoch, best_val_acc, history=load_checkpoint(model, optimizer)
+    update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path)
+
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
         val_loss, val_acc = evaluate_with_fusion(model, val_loader, loss_fn, device)
@@ -195,29 +167,76 @@ def main(config_path: str) -> None:
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            checkpoint_path = checkpoints_dir / "sharp_baseline_best.pt"
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "config": config,
-                    "epoch": epoch,
-                    "class_names": list(TARGET_CLASSES),
-                    "val_acc" : val_acc,
-                    "history": history
-                },
-                checkpoint_path,
-            )
-            logger.info("Saved new best checkpoint (val_acc=%.4f) -> %s", val_acc, checkpoint_path)
-            api.upload_file(
-                path_or_fileobj=checkpoint_path,
-                path_in_repo="checkpoints_dir/sharp_baseline_best.pt",
-                repo_id="danieledaccordo/HAReW",
-                repo_type="model"
-            )
-            logger.info("Uploaded new best checkpoint to Hugging Face")
+            update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path)
 
+    plot_train_val_history(history)
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
+
+    answer=input("Proceed with the evaluation? (Y) Yes or (Any) no")
+    if answer.lower=='y':
+        evaluation_main(config_path,checkpoint_path)
+
+def load_checkpoint(model, optimizer):
+    history = {
+        "epoch": [],
+        "train_loss": [],
+        "val_loss": [],
+        "val_acc": []
+    }
+    
+    try:
+        checkpoint=torch.load(hf_hub_download(
+            repo_id="danieledaccordo/HAReW",
+            filename="checkpoints_dir/sharp_baseline_best.pt",
+            repo_type="model"
+        ))
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        epoch=checkpoint["epoch"]+1
+        val_acc=checkpoint["val_acc"]
+        history=checkpoint["history"]
+    except EntryNotFoundError:
+        epoch=0
+        val_acc = 0.0
+
+    return epoch, val_acc, history
+
+def get_data_loaders(config):
+    _, train_subset, val_subset, _ = build_train_val_split(
+        Path(config["paths"]["doppler_traces_dir"]),
+        window_size=config["doppler"]["stacked_vectors_nw"],
+        stride=config["doppler"].get("window_stride"),
+    )
+    logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
+
+    train_loader = DataLoader(train_subset, batch_size=config["training"]["batch_size"], shuffle=True)
+    val_loader = DataLoader(val_subset, batch_size=config["training"]["batch_size"], shuffle=False)
+
+    return train_loader,val_loader
+
+def update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path):
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "config": config,
+            "epoch": epoch,
+            "class_names": list(TARGET_CLASSES),
+            "val_acc" : val_acc,
+            "history": history
+        },
+        checkpoint_path,
+    )
+    logger.info("Saved new best checkpoint (val_acc=%.4f) -> %s", val_acc, checkpoint_path)
+    api.upload_file(
+        path_or_fileobj=checkpoint_path,
+        path_in_repo="checkpoints_dir/sharp_baseline_best.pt",
+        repo_id="danieledaccordo/HAReW",
+        repo_type="model"
+    )
+    logger.info("Uploaded new best checkpoint to Hugging Face")
+
+def plot_train_val_history(history):
     plt.figure(figsize=(8,5))
     plt.plot(
         history["epoch"],
@@ -239,9 +258,8 @@ def main(config_path: str) -> None:
     plt.legend()
     plt.show()
 
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train the SHARP baseline classifier on set S1.")
+    parser = argparse.ArgumentParser(description="Train the SHARP baseline classifier.")
     parser.add_argument("--config", type=str, default="config/base_config.yaml")
     args = parser.parse_args()
     main(args.config)
