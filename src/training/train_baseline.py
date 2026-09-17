@@ -182,7 +182,7 @@ def main(config_path: str) -> None:
     loss_fn = build_loss_fn(n_classes=len(TARGET_CLASSES))
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
-    [fig, ax, train_line, val_line, display_handle] = setup_error_plot()
+    [fig, ax, train_line, val_line] = setup_error_plot()
 
     try:
         checkpoint=torch.load(hf_hub_download(
