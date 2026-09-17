@@ -18,7 +18,7 @@ from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from pathlib import Path
-from huggingface_hub import HfApi, hf_hub_download, RemoteEntryNotFoundError
+from huggingface_hub import HfApi, hf_hub_download, EntryNotFoundError
 
 logger = get_logger(__name__)
 api = HfApi()
@@ -166,7 +166,7 @@ def main(config_path: str) -> None:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch=checkpoint['epoch']+1
         best_val_acc=checkpoint['val_acc']
-    except RemoteEntryNotFoundError:
+    except EntryNotFoundError:
         start_epoch=0
         best_val_acc = 0.0
         
