@@ -195,7 +195,7 @@ def main(config_path: str) -> None:
         best_val_acc=checkpoint["val_acc"]
         history=checkpoint["history"]
         train_line.set_data(history["epoch"],history["train_loss"])
-        val_loss.set_data(history["epoch"],history["val_loss"])
+        val_line.set_data(history["epoch"],history["val_loss"])
     except EntryNotFoundError:
         start_epoch=0
         best_val_acc = 0.0
