@@ -62,7 +62,6 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
         List of StreamFileInfo for every recognized file.
     """
 
-    #'''
     root = Path(root_dir)
     infos = []
 
@@ -78,16 +77,17 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
             )
             infos.append(info)
 
-    #'''
-    '''
-    for entry in Path(root_dir).rglob("*.txt"):
-        print(entry)
-
-    infos=sum(1 for _ in Path(root_dir).rglob("*.txt"))
-    print(infos)
-    bruh=input("click")
-    '''
     return infos
+
+def count_stream_files(root_dir: str | Path) -> int:
+    n=0
+    root = Path(root_dir)
+    for txt_path in sorted(root.rglob("*.txt")):
+        match = _FILENAME_RE.match(txt_path.name)
+        if match is not None:
+            n+=1
+
+    return n
 
 
 def _load_pickled_array(path: Path) -> np.ndarray:
@@ -149,20 +149,8 @@ class DopplerTraceDataset(Dataset):
         self._build_index()
 
     def _build_index(self) -> None:
-        root = Path(self.root_dir)
-        all_files = []
-        for txt_path in sorted(root.rglob("*.txt")):
-            match = _FILENAME_RE.match(txt_path.name)
-            if match is not None:
-                info = StreamFileInfo(
-                    path=txt_path,
-                    set_id=match.group("set_num"),
-                    repetition=match.group("letter"),
-                    activity_code=match.group("activity"),
-                    antenna_idx=int(match.group("antenna")),
-                )
-                all_files.append(info)
-
+        all_files=discover_stream_files(self.root_dir)
+        
         groups: dict[tuple[str, str, str], dict[int, Path]] = {} # This was to group files by (set_id, repetition, activity_code) -> {antenna_idx: path}
         for info in all_files:
             if info.set_id not in self.sets_to_include:

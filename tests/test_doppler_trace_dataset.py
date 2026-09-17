@@ -16,7 +16,7 @@ import pytest
 from src.data.doppler_trace_dataset import (
     DopplerTraceDataset,
     build_train_val_split,
-    discover_stream_files,
+    count_stream_files,
     parse_filename,
 )
 
@@ -75,10 +75,10 @@ def test_parse_filename_rejects_non_matching():
 
 
 def test_discover_stream_files(synthetic_root):
-    files = discover_stream_files(synthetic_root)
+    files = count_stream_files(synthetic_root)
     # 6 in-scope activities * 4 antennas (S1a) + 2 excluded * 4 antennas (S1a)
     # + 1 activity * 4 antennas (S1b, W) + 1 activity * 4 antennas (S1b, L, incl. corrupt)
-    assert len(files) == 6 * 4 + 2 * 4 + 4 + 4
+    assert files == 6 * 4 + 2 * 4 + 4 + 4
 
 
 def test_dataset_excludes_h_and_s(synthetic_root):
