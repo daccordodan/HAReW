@@ -17,12 +17,32 @@ from src.training.losses import build_loss_fn
 from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
+
 from pathlib import Path
 from huggingface_hub import HfApi, hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
 
+import matplotlib.pyplot as plt
+from IPython.display import clear_output, display
+
 logger = get_logger(__name__)
 api = HfApi()
+plt.ion()
+
+def setup_error_plot():
+    fig, ax = plt.subplots(figsize=(8,5))
+    (train_line,) = ax.plot([],[],label="Train loss", color="blue", marker="o")
+    (val_line,) = ax.plot([],[],label="Val loss", color="blue", marker="o")
+
+    ax.set_title("Training and validation loss over epochs")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+    ax.legend()
+    ax.grid(True)
+
+    display_handle=display(fig, display_id=True)
+
+    return [fig, ax, train_line, val_line, display_handle]
 
 def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
@@ -125,10 +145,14 @@ def main(config_path: str) -> None:
         config_path: Path to config/base_config.yaml.
     """
     config = load_config(config_path)
-    logger.info("Loaded baseline config from %s", config_path)
-
     device = get_device()
-    logger.info("Using device: %s", device)
+
+    history = {
+        "epoch": [],
+        "train_loss": [],
+        "val_loss": [],
+        "val_acc": []
+    }
 
     data_root = Path(config["paths"]["doppler_traces_dir"])
     output_root=Path(config["paths"]["baseline_output_dir"])
@@ -157,6 +181,8 @@ def main(config_path: str) -> None:
     loss_fn = build_loss_fn(n_classes=len(TARGET_CLASSES))
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
+    [fig, ax, train_line, val_line, display_handle] = setup_error_plot()
+
     try:
         checkpoint=torch.load(hf_hub_download(
             repo_id="danieledaccordo/HAReW",
@@ -165,11 +191,15 @@ def main(config_path: str) -> None:
         ))
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch=checkpoint['epoch']+1
-        best_val_acc=checkpoint['val_acc']
+        start_epoch=checkpoint["epoch"]+1
+        best_val_acc=checkpoint["val_acc"]
+        history=checkpoint["history"]
+        train_line.set_data(history["epoch"],history["train_loss"])
+        val_loss.set_data(history["epoch"],history["val_loss"])
     except EntryNotFoundError:
         start_epoch=0
         best_val_acc = 0.0
+
         
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
@@ -178,6 +208,17 @@ def main(config_path: str) -> None:
             "Epoch %d/%d | train_loss=%.4f train_acc=%.4f | val_loss=%.4f val_acc=%.4f",
             epoch, config["training"]["epochs"], train_loss, train_acc, val_loss, val_acc,
         )
+
+        history["epoch"].append(epoch)
+        history["train_loss"].append(train_loss)
+        history["val_loss"].append(val_loss)
+        history["val_acc"].append(val_acc)
+
+        train_line.set_data(history["epoch"],history["train_loss"])
+        val_loss.set_data(history["epoch"],history["val_loss"])
+        ax.relim()
+        ax.autoscale_view()
+        display_handle.update(fig)
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -190,6 +231,7 @@ def main(config_path: str) -> None:
                     "epoch": epoch,
                     "class_names": list(TARGET_CLASSES),
                     "val_acc" : val_acc,
+                    "history": history
                 },
                 checkpoint_path,
             )
@@ -201,8 +243,9 @@ def main(config_path: str) -> None:
                 repo_type="model"
             )
             logger.info("Uploaded new best checkpoint to Hugging Face")
-
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
+    plt.ioff()
+    plt.close(fig)
 
 
 if __name__ == "__main__":
