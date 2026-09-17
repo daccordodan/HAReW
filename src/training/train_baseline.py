@@ -18,7 +18,7 @@ from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from pathlib import Path
-from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub import HfApi, hf_hub_download, RemoteEntryNotFoundError
 
 logger = get_logger(__name__)
 api = HfApi()
@@ -156,17 +156,17 @@ def main(config_path: str) -> None:
     loss_fn = build_loss_fn(n_classes=len(TARGET_CLASSES))
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
-    checkpoint=torch.load(hf_hub_download(
-        repo_id="danieledaccordo/HAReW",
-        filename="checkpoints_dir/sharp_baseline_best.pt",
-        repo_type="model"
-    ))
-    if checkpoint:
+    try:
+        checkpoint=torch.load(hf_hub_download(
+            repo_id="danieledaccordo/HAReW",
+            filename="checkpoints_dir/sharp_baseline_best.pt",
+            repo_type="model"
+        ))
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         start_epoch=checkpoint['epoch']+1
         best_val_acc=checkpoint['val_acc']
-    else:
+    except RemoteEntryNotFoundError:
         start_epoch=0
         best_val_acc = 0.0
         
