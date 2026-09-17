@@ -9,13 +9,6 @@ from torch import nn
 
 from src.models.inception_module import SimplifiedInceptionModule
 
-N_CLASSES_PRIMARY = 5    # E, W, R, J, L
-DROPOUT_RATE = 0.2
-TOTAL_PARAMS_REFERENCE = 128_535  # For comparison with the paper
-
-DEFAULT_NW = 340
-DEFAULT_ND = 100
-
 
 class SHARPClassifier(nn.Module):
     """Single-antenna SHARP activity classifier.
@@ -31,11 +24,11 @@ class SHARPClassifier(nn.Module):
 
     def __init__(
         self,
-        n_classes: int = N_CLASSES_PRIMARY,
-        nw: int = DEFAULT_NW,
-        nd: int = DEFAULT_ND,
+        n_classes: int = 5, # E, W, R, J, L
+        nw: int = 340,
+        nd: int = 100,
         reduced_channels: int = 3,
-        dropout_rate: float = DROPOUT_RATE,
+        dropout_rate: float = 0.2,
     ) -> None:
         """Initializes the classifier.
 

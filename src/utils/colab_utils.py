@@ -81,6 +81,7 @@ def get_output_root(local_default: str = "outputs", drive_subpath: str | None = 
     Path(local_default).mkdir(parents=True, exist_ok=True)
     return Path(local_default)
 
+#TODO: guarda le funzioni qui sopra
 
 def get_device() -> str:
     """Returns "cuda" if a GPU is available (e.g. Colab GPU runtime), else "cpu"."""

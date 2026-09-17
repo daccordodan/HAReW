@@ -204,6 +204,7 @@ def load_checkpoint(model, optimizer):
 def get_data_loaders(config):
     _, train_subset, val_subset, _ = build_train_val_split(
         Path(config["paths"]["doppler_traces_dir"]),
+        "S1",
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
     )

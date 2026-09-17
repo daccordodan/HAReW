@@ -18,7 +18,6 @@ from typing import Literal
 
 import numpy as np
 import torch
-import os, os.path
 from torch.utils.data import Dataset
 
 from src.data.label_mapping import is_in_scope, raw_to_class_index
@@ -27,11 +26,9 @@ _FILENAME_RE = re.compile(
     r"^(?P<set_num>S\d+)(?P<letter>[a-z])_(?P<activity>[A-Za-z0-9]+)_stream_(?P<antenna>\d)\.txt$"  #set_num,letter,activity,antenna just in case are needed in future
 )
 
-DEFAULT_NW = 340   # Doppler vectors per input (~2s)
-DEFAULT_NANT = 4   # monitor antennas
+DEFAULT_NW = 340 # Doppler vectors per input (~2s)
+DEFAULT_NANT = 100 # monitor antennas
 DEFAULT_STRIDE = 1 # default stride
-
-TRAIN_ONLY_SET = "S1"
 
 
 @dataclass(frozen=True)
@@ -171,13 +168,11 @@ class DopplerTraceDataset(Dataset):
             min_len = min(s.shape[0] for s in per_antenna_streams)
 
             start_idx, end_idx = self.evaluate_temp_split(min_len)
-
             slice_len = end_idx - start_idx
             if slice_len < self.window_size:
                 continue
 
             per_antenna_streams = [s[start_idx:end_idx] for s in per_antenna_streams]
-
             stacked_recording = np.stack([s[:min_len] for s in per_antenna_streams], axis=0)
             rec_idx = len(self._recordings)
             self._recordings.append(stacked_recording)
@@ -255,7 +250,7 @@ class DopplerTraceDataset(Dataset):
 
 def build_train_val_split(
     root_dir: str | Path,
-    set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"] = TRAIN_ONLY_SET,
+    set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:

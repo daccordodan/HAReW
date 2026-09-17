@@ -114,6 +114,6 @@ def test_sample_shape(synthetic_root):
 
 def test_train_val_split_sizes(synthetic_root):
     full_ds, train_ds, val_ds, test_ds = build_train_val_split(
-        synthetic_root, window_size=340, train_frac=0.6, val_frac=0.2
+        synthetic_root, "S1", window_size=340, train_frac=0.6, val_frac=0.2
     )
     assert len(train_ds) + len(val_ds) + len(test_ds) == len(full_ds)
