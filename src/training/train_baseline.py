@@ -23,27 +23,9 @@ from huggingface_hub import HfApi, hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
 
 import matplotlib.pyplot as plt
-import ipywidgets as widgets
-from IPython.display import clear_output, display
 
 logger = get_logger(__name__)
 api = HfApi()
-chart_output=widgets.Output()
-display(chart_output)
-
-def setup_error_plot():
-    fig, ax = plt.subplots(figsize=(8,5))
-    (train_line,) = ax.plot([],[],label="Train loss", color="blue", marker="o")
-    (val_line,) = ax.plot([],[],label="Val loss", color="red", marker="o")
-
-    ax.set_title("Training and validation loss over epochs")
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss")
-    ax.legend()
-    ax.grid(True)
-    plt.close(fig)
-
-    return [fig, ax, train_line, val_line]
 
 def _flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
@@ -182,8 +164,6 @@ def main(config_path: str) -> None:
     loss_fn = build_loss_fn(n_classes=len(TARGET_CLASSES))
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
-    [fig, ax, train_line, val_line] = setup_error_plot()
-
     try:
         checkpoint=torch.load(hf_hub_download(
             repo_id="danieledaccordo/HAReW",
@@ -195,8 +175,6 @@ def main(config_path: str) -> None:
         start_epoch=checkpoint["epoch"]+1
         best_val_acc=checkpoint["val_acc"]
         history=checkpoint["history"]
-        train_line.set_data(history["epoch"],history["train_loss"])
-        val_line.set_data(history["epoch"],history["val_loss"])
     except EntryNotFoundError:
         start_epoch=0
         best_val_acc = 0.0
@@ -214,14 +192,6 @@ def main(config_path: str) -> None:
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["val_acc"].append(val_acc)
-
-        train_line.set_data(history["epoch"],history["train_loss"])
-        val_line.set_data(history["epoch"],history["val_loss"])
-        ax.relim()
-        ax.autoscale_view()
-        with chart_output:
-            chart_output.clear_output(wait=True)
-            display(fig)
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
@@ -246,9 +216,28 @@ def main(config_path: str) -> None:
                 repo_type="model"
             )
             logger.info("Uploaded new best checkpoint to Hugging Face")
+
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
-    plt.ioff()
-    plt.close(fig)
+    plt.figure(figsize=(8,5))
+    plt.plot(
+        history["epoch"],
+        history["train_loss"],
+        lanel="Train loss",
+        color="blue",
+        marker="o"
+    )
+    plt.plot(
+        history["epoch"],
+        history["val_loss"],
+        lanel="Validation loss",
+        color="red",
+        marker="o"
+    )
+    plt.title("Training and validation loss over epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.show()
 
 
 if __name__ == "__main__":
