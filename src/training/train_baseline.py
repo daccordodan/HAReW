@@ -18,7 +18,8 @@ from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from pathlib import Path
-from huggingface_hub import HfApi, hf_hub_download, EntryNotFoundError
+from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub.errors import EntryNotFoundError
 
 logger = get_logger(__name__)
 api = HfApi()
