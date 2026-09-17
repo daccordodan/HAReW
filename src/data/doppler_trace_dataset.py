@@ -62,12 +62,9 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
         List of StreamFileInfo for every recognized file.
     """
 
-    '''
+    #'''
     root = Path(root_dir)
     infos = []
-
-    print(len(root.rglob("*.txt")))
-    print(len(sorted(root.rglob("*.txt"))))
 
     for txt_path in sorted(root.rglob("*.txt")):
         match = _FILENAME_RE.match(txt_path.name)
@@ -81,10 +78,15 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
             )
             infos.append(info)
 
-    print(infos)
+    #'''
     '''
+    for entry in Path(root_dir).rglob("*.txt"):
+        print(entry)
 
-    infos=len([name for name in os.listdir('.') if os.path.isfile(name)])
+    infos=sum(1 for _ in Path(root_dir).rglob("*.txt"))
+    print(infos)
+    bruh=input("click")
+    '''
     return infos
 
 
