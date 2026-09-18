@@ -134,9 +134,10 @@ def main(config_path: str) -> None:
     output_root=Path(config["paths"]["baseline_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
 
+    checkpoint_name="sharp_baseline_best.pt"
     checkpoints_dir = output_root / "checkpoints"
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_path = checkpoints_dir / "sharp_baseline_best.pt"
+    checkpoint_path = checkpoints_dir / checkpoint_name
 
     model = SHARPClassifier(
         n_classes=len(TARGET_CLASSES),
@@ -150,7 +151,7 @@ def main(config_path: str) -> None:
 
     train_loader,val_loader=get_data_loaders(config)
     start_epoch, best_val_acc, history=load_checkpoint(model, optimizer)
-    update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path)
+    update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path,checkpoint_name)
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
@@ -167,7 +168,7 @@ def main(config_path: str) -> None:
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path)
+            update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path,checkpoint_name)
 
     plot_train_val_history(history)
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
@@ -215,7 +216,7 @@ def get_data_loaders(config):
 
     return train_loader,val_loader
 
-def update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path):
+def update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path, checkpoint_name):
     torch.save(
         {
             "model_state_dict": model.state_dict(),
@@ -231,7 +232,7 @@ def update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_p
     logger.info("Saved new best checkpoint (val_acc=%.4f) -> %s", val_acc, checkpoint_path)
     api.upload_file(
         path_or_fileobj=checkpoint_path,
-        path_in_repo="checkpoints_dir/sharp_baseline_best.pt",
+        path_in_repo="checkpoints_dir/"+checkpoint_name,
         repo_id="danieledaccordo/HAReW",
         repo_type="model"
     )

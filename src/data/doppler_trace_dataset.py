@@ -30,6 +30,7 @@ DEFAULT_NW = 340 # Doppler vectors per input (~2s)
 DEFAULT_NANT = 100 # monitor antennas
 DEFAULT_STRIDE = 1 # default stride
 
+DEFAULT_TRAIN = "S1"
 
 @dataclass(frozen=True)
 class StreamFileInfo:
@@ -250,7 +251,7 @@ class DopplerTraceDataset(Dataset):
 
 def build_train_val_split(
     root_dir: str | Path,
-    set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
+    set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"] = DEFAULT_TRAIN,
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
@@ -267,7 +268,7 @@ def build_train_val_split(
 
     train_dataset = DopplerTraceDataset(
         root_dir, 
-        sets_to_include=(set_id,), 
+        sets_to_include=(DEFAULT_TRAIN,), 
         window_size=window_size, 
         stride=stride,
         temporal_split="train"
