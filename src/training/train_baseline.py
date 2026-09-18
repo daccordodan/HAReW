@@ -150,8 +150,7 @@ def main(config_path: str) -> None:
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
     train_loader,val_loader=get_data_loaders(config)
-    start_epoch, best_val_acc, history=load_checkpoint(model, optimizer)
-    update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path,checkpoint_name)
+    start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
@@ -177,7 +176,7 @@ def main(config_path: str) -> None:
     if answer.lower=='y':
         evaluation_main(config_path,checkpoint_path)
 
-def load_checkpoint(model, optimizer):
+def load_checkpoint(model, optimizer, config, checkpoint_path):
     history = {
         "epoch": [],
         "train_loss": [],
@@ -196,6 +195,18 @@ def load_checkpoint(model, optimizer):
         epoch=checkpoint["epoch"]+1
         val_acc=checkpoint["val_acc"]
         history=checkpoint["history"]
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "config": config,
+                "epoch": epoch,
+                "class_names": list(TARGET_CLASSES),
+                "val_acc" : val_acc,
+                "history": history
+            },
+            checkpoint_path,
+        )
     except EntryNotFoundError:
         epoch=0
         val_acc = 0.0
