@@ -27,7 +27,7 @@ _FILENAME_RE = re.compile(
 )
 
 DEFAULT_NW = 340 # Doppler vectors per input (~2s)
-DEFAULT_NANT = 100 # monitor antennas
+DEFAULT_NANT = 4 # monitor antennas
 DEFAULT_STRIDE = 1 # default stride
 
 
@@ -163,7 +163,6 @@ class DopplerTraceDataset(Dataset):
         for (set_id, repetition, activity_code), antenna_paths in groups.items():
             per_antenna_streams = []
             for i in range(self.n_antennas):
-                print(i)
                 per_antenna_streams.append(_load_pickled_array(antenna_paths[i]))
 
             min_len = min(s.shape[0] for s in per_antenna_streams)
