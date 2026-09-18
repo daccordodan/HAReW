@@ -17,7 +17,6 @@ from src.training.losses import build_loss_fn
 from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
-from src.training.evaluate_baseline import main as evaluation_main
 
 from pathlib import Path
 from huggingface_hub import HfApi, hf_hub_download
@@ -171,10 +170,6 @@ def main(config_path: str) -> None:
 
     plot_train_val_history(history)
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
-
-    answer=input("Proceed with the evaluation? (Y) Yes or (Any) no")
-    if answer.lower=='y':
-        evaluation_main(config_path,checkpoint_path)
 
 def load_checkpoint(model, optimizer, config, checkpoint_path):
     history = {

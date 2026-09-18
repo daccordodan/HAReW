@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 
-from src.training.evaluate_baseline import main as evaluate_main
+from src.evaluation.evaluate_baseline import main as evaluate_main
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate the SHARP baseline across S1-S7.")
