@@ -24,8 +24,8 @@ import numpy as np
 S7_REFERENCE_ACCURACY = 0.9599  # Paper 2, Table 3 -- worst-case benchmark
 
 
-def compute_accuracy(y_true: list[int], y_pred: list[int]) -> float:
-    """Computes overall classification accuracy.
+def compute_accuracy_per_activity(y_true: list[int], y_pred: list[int], class_names: list[str]) -> float:
+    """Computes overall per-activity classification accuracy.
 
     Args:
         y_true: Ground-truth class indices.
@@ -36,10 +36,26 @@ def compute_accuracy(y_true: list[int], y_pred: list[int]) -> float:
         rather than raising, since evaluate_baseline.py may encounter
         empty test sets for sets not yet uploaded (see docs/PROJECT_STATUS.md).
     """
+
+    accuracy_pa: dict[str, float] = {}
     if len(y_true) == 0:
         return 0.0
-    correct = sum(1 for t, p in zip(y_true, y_pred) if t == p)
-    return correct / len(y_true)
+
+    correct=0
+    correct_pa=list()
+    counts_pa=list()
+    for t, p in zip(y_true, y_pred):
+        counts_pa[y_true]+=1
+        if t==p:
+            correct_pa[y_true]+=1
+            correct+=1
+            
+    for class_idx, class_name in enumerate(class_names):
+        accuracy_pa[class_name]=correct_pa[class_idx]/counts_pa[class_idx]
+
+    correct /= len(y_pred)
+
+    return accuracy_pa, correct
 
 
 def compute_f1_per_activity(y_true: list[int], y_pred: list[int], class_names: list[str]) -> dict[str, float]:
@@ -95,7 +111,7 @@ def report_per_set_accuracy(results_by_set: dict[str, float]) -> str:
     Returns:
         A human-readable multi-line report string.
     """
-    lines = ["Per-set accuracy (measured vs. Paper 2 reference where available):"]
+    lines = ["Per-set accuracy:"]
     for set_id, acc in results_by_set.items():
         if set_id == "S7":
             lines.append(f"  {set_id}: {acc:.4f}  (paper reference: {S7_REFERENCE_ACCURACY:.4f})")

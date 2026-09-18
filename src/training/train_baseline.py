@@ -168,7 +168,9 @@ def main(config_path: str) -> None:
             best_val_acc = val_acc
             update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_path,checkpoint_name)
 
-    plot_train_val_history(history)
+    figures_dir = output_root / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    plot_train_val_history(history,figures_dir)
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
 
 def load_checkpoint(model, optimizer, config, checkpoint_path):
@@ -244,7 +246,7 @@ def update_checkpoints(model,optimizer,config,epoch,val_acc,history,checkpoint_p
     )
     logger.info("Uploaded new best checkpoint to Hugging Face")
 
-def plot_train_val_history(history):
+def plot_train_val_history(history, figures_dir: Path):
     plt.figure(figsize=(8,5))
     plt.plot(
         history["epoch"],
@@ -264,6 +266,7 @@ def plot_train_val_history(history):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
+    plt.savefig(figures_dir / "train_validation_over_epoch_baseline.png", bbox_inches='tight', dpi=300)
     plt.show()
 
 if __name__ == "__main__":
