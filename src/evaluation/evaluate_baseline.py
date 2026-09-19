@@ -79,6 +79,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
 
     _, _, _, s1_test_subset = build_train_val_split(
         data_root,
+        set_id="S1",
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
     )
