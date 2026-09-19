@@ -87,7 +87,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     accuracy_by_set_pa["S1"],  accuracy_by_set["S1"] = compute_accuracy_per_activity(y_true, y_pred,TARGET_CLASSES)
     fscore_by_set_pa["S1"] = compute_f1_per_activity(y_true,y_pred,TARGET_CLASSES)
 
-    set_ids=("S2", "S3", "S4", "S5", "S6", "S7")
+    set_ids=["S2", "S3", "S4", "S5", "S6", "S7"]
     for set_id in set_ids:
         test_dataset = build_zero_shot_test_set(
             data_root,
@@ -114,7 +114,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     figures_dir = output_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    set_ids= "S1"+set_ids
+    set_ids.insert(0,"S1")
     plot_acc_f1_results_pa(accuracy_by_set_pa,fscore_by_set_pa)
     plot_conf_mat_results_pa(conf_mat_by_set, set_ids, TARGET_CLASSES, figures_dir)
 
