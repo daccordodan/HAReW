@@ -45,9 +45,9 @@ def compute_accuracy_per_activity(y_true: list[int], y_pred: list[int], class_na
     correct_pa=list()
     counts_pa=list()
     for t, p in zip(y_true, y_pred):
-        counts_pa[y_true]+=1
+        counts_pa[t]+=1
         if t==p:
-            correct_pa[y_true]+=1
+            correct_pa[t]+=1
             correct+=1
             
     for class_idx, class_name in enumerate(class_names):
