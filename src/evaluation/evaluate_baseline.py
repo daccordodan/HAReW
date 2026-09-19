@@ -77,6 +77,8 @@ def main(config_path: str, checkpoint_name: str) -> None:
     fscore_by_set_pa: dict[str, dict[str, float]] = {}
     conf_mat_by_set: dict[str, np.ndarray] = {}
 
+    logger.info("=== Starting evaluation ===")
+    logger.info("Evaluated set S1:")
     _, _, _, s1_test_subset = build_train_val_split(
         data_root,
         set_id="S1",
@@ -90,6 +92,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
 
     set_ids=["S2", "S3", "S4", "S5", "S6", "S7"]
     for set_id in set_ids:
+        logger.info(f"Evaluated set {set_id}:")
         test_dataset = build_zero_shot_test_set(
             data_root,
             set_id=set_id,
