@@ -89,6 +89,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     y_true, y_pred = evaluate_set(model, s1_loader, device)
     accuracy_by_set_pa["S1"],  accuracy_by_set["S1"] = compute_accuracy_per_activity(y_true, y_pred,TARGET_CLASSES)
     fscore_by_set_pa["S1"] = compute_f1_per_activity(y_true,y_pred,TARGET_CLASSES)
+    conf_mat_by_set["S1"] = compute_confusion_matrix(y_true, y_pred, len(TARGET_CLASSES))
 
     set_ids=["S2", "S3", "S4", "S5", "S6", "S7"]
     for set_id in set_ids:
