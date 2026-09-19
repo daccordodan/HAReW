@@ -124,6 +124,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     plot_conf_mat_results_pa(conf_mat_by_set, set_ids, TARGET_CLASSES, figures_dir)
 
     files_dir = output_root / "text"
+    files_dir.mkdir(parents=True, exist_ok=True)
     write_report_performances(accuracy_by_set, accuracy_by_set_pa, fscore_by_set_pa, files_dir)
 
 
