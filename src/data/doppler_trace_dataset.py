@@ -139,7 +139,6 @@ class DopplerTraceDataset(Dataset):
         self._recordings: list[np.ndarray] = []
         self._window_indices: list[tuple[int, int, int]] = []
 
-        self._meta: list[dict] = []
         self._excluded_counts: dict[str, int] = {}
         self._corrupt_files: list[str] = []
 
@@ -184,17 +183,7 @@ class DopplerTraceDataset(Dataset):
 
             for w in range(n_windows):
                 start_time = w * self.stride
-                
                 self._window_indices.append((rec_idx, start_time, class_idx, subject))
-                self._meta.append(          #Need to look at this, if it could be useful for the tasks
-                    {
-                        "set_id": set_id,
-                        "repetition": repetition,
-                        "activity_code": activity_code,
-                        "window_idx": w,
-                        "split": self.temporal_split,
-                    }
-                )
 
     def __len__(self) -> int:
         return len(self._window_indices)
@@ -238,15 +227,6 @@ class DopplerTraceDataset(Dataset):
         else:
             return 0, min_len
 
-    def summary(self) -> dict:
-        """This is used for debug: produces a small report."""
-        return {
-            "root_dir": str(self.root_dir),
-            "sets_included": self.sets_to_include,
-            "excluded_raw_activity_counts": dict(self._excluded_counts),
-            "corrupt_files": list(self._corrupt_files),
-        }
-
 
 def build_train_val_split(
     root_dir: str | Path,
@@ -272,7 +252,6 @@ def build_train_val_split(
         stride=stride,
         temporal_split="train"
     )
-    print(train_dataset.summary())
     val_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
@@ -280,7 +259,6 @@ def build_train_val_split(
         stride=stride,
         temporal_split="val"
     )
-    print(val_dataset.summary())
     test_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
@@ -288,7 +266,6 @@ def build_train_val_split(
         stride=stride,
         temporal_split="test"
     )
-    print(test_dataset.summary())
 
     train_subset = torch.utils.data.Subset(train_dataset, range(len(train_dataset)))
     val_subset = torch.utils.data.Subset(val_dataset, range(len(val_dataset)))
