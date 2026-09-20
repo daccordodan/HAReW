@@ -117,6 +117,7 @@ class DopplerTraceDataset(Dataset):
         stride: int = DEFAULT_STRIDE,
         n_antennas: int = DEFAULT_NANT,
         temporal_split: Literal["train", "val", "test", "all"] = "all",
+        transform = None
     ) -> None:
         """Indexes and windows all in-scope samples for the requested sets
         and creates training, validation and test sets from the original set.
@@ -135,6 +136,7 @@ class DopplerTraceDataset(Dataset):
         self.stride = stride or window_size
         self.n_antennas = n_antennas
         self.temporal_split = temporal_split
+        self.transform = transform
 
         self._recordings: list[np.ndarray] = []
         self._window_indices: list[tuple[int, int, int]] = []
@@ -188,7 +190,7 @@ class DopplerTraceDataset(Dataset):
     def __len__(self) -> int:
         return len(self._window_indices)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, dict[int, int]]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor | tuple[torch.Tensor, torch.Tensor], dict[str, int]]:
         """Returns (doppler_trace, label), this slices windows on the fly.
 
         Args:
@@ -202,6 +204,11 @@ class DopplerTraceDataset(Dataset):
         end_time = start_time + self.window_size
 
         window = self._recordings[rec_idx][:, start_time:end_time, :]
+
+        if self.transform is not None:
+            sample = self.transform(window)
+            return (torch.tensor(window, dtype=torch.float32),torch.tensor(sample, dtype=torch.float32)), {"label": label, "subject": subject}
+        
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
     def evaluate_temp_split(self,min_len) -> tuple[int, int]:
