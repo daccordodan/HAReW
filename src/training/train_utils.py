@@ -60,7 +60,7 @@ def evaluate_with_fusion(model, val_loader, loss_fn, device):
             probs_reshaped = probs_flat.view(batch_size, Nant, -1)
             fused_preds = fuse_batch(probs_reshaped.cpu(), n_antennas=Nant)
 
-            targets_cpu = targets.cpu()
+            targets_cpu = targets["label"].cpu()
             correct_fused += (fused_preds == targets_cpu).sum().item()
             total_samples += batch_size
 
