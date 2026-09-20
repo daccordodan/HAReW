@@ -273,6 +273,7 @@ def build_train_val_split(
         stride=stride,
         temporal_split="train"
     )
+    print(train_dataset.summary())
     val_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
@@ -280,6 +281,7 @@ def build_train_val_split(
         stride=stride,
         temporal_split="val"
     )
+    print(val_dataset.summary())
     test_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
@@ -287,6 +289,7 @@ def build_train_val_split(
         stride=stride,
         temporal_split="test"
     )
+    print(test_dataset.summary())
 
     train_subset = torch.utils.data.Subset(train_dataset, range(len(train_dataset)))
     val_subset = torch.utils.data.Subset(val_dataset, range(len(val_dataset)))

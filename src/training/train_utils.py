@@ -50,7 +50,7 @@ def evaluate_with_fusion(model, val_loader, loss_fn, device):
         for inputs, targets in val_loader:
             batch_size, Nant, Nw, ND = inputs.shape
             inputs_flat = inputs.view(batch_size * Nant, 1, Nw, ND).to(device)
-            targets_flat = targets.repeat_interleave(Nant).to(device)
+            targets_flat = targets["label"].repeat_interleave(Nant).to(device)
 
             logits_flat = model(inputs_flat)
             loss = loss_fn(logits_flat, targets_flat)
