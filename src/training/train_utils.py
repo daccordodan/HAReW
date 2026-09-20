@@ -148,14 +148,14 @@ def plot_train_val_history(history, figures_dir: Path, figure_name):
     plt.plot(
         history["epoch"],
         history["train_loss"],
-        lanel="Train loss",
+        label="Train loss",
         color="blue",
         marker="o"
     )
     plt.plot(
         history["epoch"],
         history["val_loss"],
-        lanel="Validation loss",
+        label="Validation loss",
         color="red",
         marker="o"
     )
