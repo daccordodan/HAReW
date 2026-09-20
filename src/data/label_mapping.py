@@ -19,6 +19,16 @@ RAW_TO_TARGET: dict[str, str] = {
     "L2": "L",
 }
 
+SCENARIO_TO_SUBJECT: dict[str, int] = {
+    "S1" : 1,
+    "S2" : 1,
+    "S3" : 2,
+    "S4" : 1,
+    "S5" : 2,
+    "S6" : 1,
+    "S7" : 3,
+}
+
 TARGET_TO_INDEX: dict[str, int] = {name: i for i, name in enumerate(TARGET_CLASSES)}
 INDEX_TO_TARGET: dict[int, str] = {i: name for name, i in TARGET_TO_INDEX.items()}
 

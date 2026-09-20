@@ -38,20 +38,30 @@ class ContrastiveEncoder(nn.Module):
     from the baseline's classifier_head.
     """
 
-    def __init__(self, projection_dim: int = 64) -> None:
-        """Initializes the contrastive encoder.
+    def __init__(
+        self,
+        n_classes: int = 5, # E, W, R, J, L
+        nw: int = 340,
+        nd: int = 100,
+        reduced_channels: int = 3,
+        dropout_rate: float = 0.2,
+    ) -> None:
+        """Initializes the classifier.
 
         Args:
-            projection_dim: Output dimensionality of the contrastive
-                projection head (typical SimCLR-style range: 64-256).
+            n_classes: Number of output activity classes.
+            nw: Nw, input Doppler trace time dimension.
+            nd: ND, input Doppler trace bin dimension.
+            reduced_channels: Output channels of the 1x1 reduction conv.
+            dropout_rate: Dropout probability before the final dense layer.
         """
         super().__init__()
-        self.backbone = SimplifiedInceptionModule(in_channels=1)
-        raise NotImplementedError(
-            "TODO: define pooling + projection head, and the augmentation "
-            "pipeline appropriate for Doppler traces (e.g. time-window jitter, "
-            "velocity-bin masking) once the contrastive strategy is scoped."
-        )
+        self.feature_extractor = SimplifiedInceptionModule(in_channels=1)
+        self.reduction_conv = nn.Conv2d(self.feature_extractor.out_channels, reduced_channels, kernel_size=1)
+        self.relu = nn.ReLU(inplace=True)
+        self.dropout = nn.Dropout(p=dropout_rate)
+        pooled_nw, pooled_nd = nw // 2, nd // 2
+        self.classifier_head = nn.Linear(reduced_channels * pooled_nw * pooled_nd, n_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Encodes a Doppler trace into the contrastive embedding space.

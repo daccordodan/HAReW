@@ -54,7 +54,7 @@ def main(config_path: str) -> None:
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
-    train_loader,val_loader=get_data_loaders(logger, config)
+    train_loader,val_loader=get_data_loaders(logger, config, "S1")
     start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
@@ -106,7 +106,7 @@ def run_epoch(
 
     with context:
         for batch_x, batch_y in dataloader:
-            flattened_x, flattened_y = flatten_antennas(batch_x, batch_y)
+            flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
             flattened_x, flattened_y = flattened_x.to(device), flattened_y.to(device)
 
             logits = model(flattened_x)

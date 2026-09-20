@@ -20,7 +20,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from src.data.label_mapping import is_in_scope, raw_to_class_index
+from src.data.label_mapping import is_in_scope, raw_to_class_index, SCENARIO_TO_SUBJECT
 
 _FILENAME_RE = re.compile(
     r"^(?P<set_num>S\d+)(?P<letter>[a-z])_(?P<activity>[A-Za-z0-9]+)_stream_(?P<antenna>\d)\.txt$"  #set_num,letter,activity,antenna just in case are needed in future
@@ -178,13 +178,14 @@ class DopplerTraceDataset(Dataset):
             self._recordings.append(stacked_recording)
 
             class_idx = raw_to_class_index(activity_code)
+            subject = SCENARIO_TO_SUBJECT[set_id]
             
             n_windows = 1 + (slice_len - self.window_size) // self.stride           # Calculate how many valid windows can be extracted
 
             for w in range(n_windows):
                 start_time = w * self.stride
                 
-                self._window_indices.append((rec_idx, start_time, class_idx))
+                self._window_indices.append((rec_idx, start_time, class_idx, subject))
                 self._meta.append(          #Need to look at this, if it could be useful for the tasks
                     {
                         "set_id": set_id,
@@ -198,7 +199,7 @@ class DopplerTraceDataset(Dataset):
     def __len__(self) -> int:
         return len(self._window_indices)
 
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, dict[int, int]]:
         """Returns (doppler_trace, label), this slices windows on the fly.
 
         Args:
@@ -208,11 +209,11 @@ class DopplerTraceDataset(Dataset):
             doppler_trace: PyTorch tensor.
             label: Integer target class index.
         """
-        rec_idx, start_time, label = self._window_indices[idx]
+        rec_idx, start_time, label, subject = self._window_indices[idx]
         end_time = start_time + self.window_size
 
         window = self._recordings[rec_idx][:, start_time:end_time, :]
-        return torch.tensor(window, dtype=torch.float32), label
+        return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
     def evaluate_temp_split(self,min_len) -> tuple[int, int]:
         """Evaluates the starting and ending index for the requested sets.

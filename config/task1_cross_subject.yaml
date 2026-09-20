@@ -13,15 +13,23 @@ paths:
   colab_drive_subpath: null
   colab_drive_output_subpath: null
 
+doppler:
+  stacked_vectors_nw: 340       # Nw -- window length fed to the classifier
+  velocity_bins_nd: 100          # ND -- verified against real uploaded files (shape[1]==100)
+  window_stride: 1           # null = non-overlapping windows (stride=Nw); set < Nw to oversample short recordings (e.g. jumping)
+
+training:
+  batch_size: 16                 # per-window batches
+  learning_rate: 0.001
+  epochs: 50
+  train_split: 0.6
+  val_split: 0.2
+  pretraining_epochs: 100
+  finetune_epochs: 20
+
 contrastive:
   projection_dim: 64             # placeholder -- to be tuned during extension phase
   temperature: 0.1                # SimCLR-style contrastive temperature (placeholder)
   augmentations: []                # TODO: define Doppler-trace-appropriate augmentations
-
-training:
-  batch_size: 16
-  learning_rate: 0.0005
-  pretraining_epochs: 100
-  finetune_epochs: 20
 
 seed: 42

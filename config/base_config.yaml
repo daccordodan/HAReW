@@ -27,7 +27,7 @@ model:
 training:
   batch_size: 16                 # per-window batches
   learning_rate: 0.001
-  epochs: 50
+  epochs: 25
   train_split: 0.6               # of S1 only
   val_split: 0.2                 # of S1 only (remaining 0.2 = held-out S1 test)
 
