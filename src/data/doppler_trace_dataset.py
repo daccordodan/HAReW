@@ -243,7 +243,6 @@ class DopplerTraceDataset(Dataset):
         return {
             "root_dir": str(self.root_dir),
             "sets_included": self.sets_to_include,
-            "n_samples": len(self._samples),
             "excluded_raw_activity_counts": dict(self._excluded_counts),
             "corrupt_files": list(self._corrupt_files),
         }
