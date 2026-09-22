@@ -63,7 +63,7 @@ def main(config_path: str) -> None:
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
-    train_loader,val_loader=get_data_loaders(logger, config, "S1",)
+    train_loader,val_loader=get_data_loaders(logger, config, "S1", transform)
     start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
