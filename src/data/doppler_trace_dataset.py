@@ -209,7 +209,7 @@ class DopplerTraceDataset(Dataset):
         fig = create_spectrogram(
             window,
             sample_rate=170.0,
-            cmap="cold"
+            cmap="hot"
         )
         fig.savefig("test_spectrogram.png", dpi=150, bbox_inches="tight")
 
