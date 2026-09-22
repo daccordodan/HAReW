@@ -270,7 +270,7 @@ def create_spectrogram(
     nw, nd = doppler_window.shape
     duration = nw / sample_rate
 
-    fig, ax = plt.subplots(figsize=figsize)
+    _, fig, ax = plt.subplots(figsize=figsize)
 
     # Normalize data if needed for visualization
     if vmin is None:
