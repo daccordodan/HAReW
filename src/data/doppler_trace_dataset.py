@@ -216,6 +216,7 @@ class DopplerTraceDataset(Dataset):
         mm = input("ciao: pausa")
 
         if self.transform is not None:
+            print("is not none")
             sample1 = self.transform(window)
             fig = create_spectrogram(
                 sample1,
