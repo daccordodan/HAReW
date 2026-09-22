@@ -211,6 +211,7 @@ class DopplerTraceDataset(Dataset):
             sample_rate=170.0,
             cmap="hot"
         )
+        fig.savefig("test_spectrogram.png", dpi=150, bbox_inches="tight")
 
         mm = input("ciao: pausa")
 
@@ -222,27 +223,27 @@ class DopplerTraceDataset(Dataset):
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
     def evaluate_temp_split(self,min_len) -> tuple[int, int]:
-            """Evaluates the starting and ending index for the requested sets.
+        """Evaluates the starting and ending index for the requested sets.
 
-            Args:
-                min_len: Length of the shortest window.
-            """
-            if self.temporal_split != "all":
-                gap = self.window_size 
+        Args:
+            min_len: Length of the shortest window.
+        """
+        if self.temporal_split != "all":
+            gap = self.window_size 
 
-                train_end = int(min_len * 0.6)
-                val_start = train_end + gap
-                val_end = val_start + int(min_len * 0.2)
-                test_start = val_end + gap
+            train_end = int(min_len * 0.6)
+            val_start = train_end + gap
+            val_end = val_start + int(min_len * 0.2)
+            test_start = val_end + gap
 
-                if self.temporal_split == "train":
-                    return 0, train_end
-                elif self.temporal_split == "val":
-                    return val_start, val_end
-                elif self.temporal_split == "test":
-                    return test_start, min_len
-            else:
-                return 0, min_len
+            if self.temporal_split == "train":
+                return 0, train_end
+            elif self.temporal_split == "val":
+                return val_start, val_end
+            elif self.temporal_split == "test":
+                return test_start, min_len
+        else:
+            return 0, min_len
 
 def create_spectrogram(
     doppler_window: np.ndarray,
