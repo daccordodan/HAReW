@@ -206,8 +206,9 @@ class DopplerTraceDataset(Dataset):
         window = self._recordings[rec_idx][:, start_time:end_time, :]
 
         if self.transform is not None:
-            sample = self.transform(window)
-            return (torch.tensor(window, dtype=torch.float32),torch.tensor(sample, dtype=torch.float32)), {"label": label, "subject": subject}
+            sample1 = self.transform(window)
+            sample2 = self.transform(window)
+            return (torch.tensor(sample1, dtype=torch.float32),torch.tensor(sample2, dtype=torch.float32)), {"label": label, "subject": subject}
         
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
