@@ -25,7 +25,7 @@ from src.training.train_utils import flatten_antennas, evaluate_with_fusion, loa
 from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
-from src.models.transform import DopplerTraceTransformation
+from src.models.transform import dopplerTraceTransformation
 
 from pathlib import Path
 
@@ -59,7 +59,7 @@ def main(config_path: str) -> None:
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
-    transform = DopplerTraceTransformation
+    transform = dopplerTraceTransformation
     print(transform)
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
