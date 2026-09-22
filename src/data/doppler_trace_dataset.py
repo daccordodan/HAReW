@@ -205,7 +205,7 @@ class DopplerTraceDataset(Dataset):
         end_time = start_time + self.window_size
 
         window = self._recordings[rec_idx][:, start_time:end_time, :]
-
+        print(window.shape)
         fig = create_spectrogram(
             window,
             sample_rate=170.0,
