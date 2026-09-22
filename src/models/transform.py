@@ -5,5 +5,5 @@ class DopplerTraceTransformation:
         None
 
     def __call__(self, window):
-        noise = np.random.randn(*window.shape) * 0.02
+        noise = np.random.randn(*window.shape) * 0.1
         return np.clip(window + noise, 0, 1)

@@ -217,7 +217,19 @@ class DopplerTraceDataset(Dataset):
 
         if self.transform is not None:
             sample1 = self.transform(window)
+            fig = create_spectrogram(
+                sample1,
+                sample_rate=170.0,
+                cmap="hot"
+            )
+            fig.savefig("test_spectrogram_change1.png", dpi=150, bbox_inches="tight")
             sample2 = self.transform(window)
+            fig = create_spectrogram(
+                sample2,
+                sample_rate=170.0,
+                cmap="hot"
+            )
+            fig.savefig("test_spectrogram_change2.png", dpi=150, bbox_inches="tight")
             return (torch.tensor(sample1, dtype=torch.float32),torch.tensor(sample2, dtype=torch.float32)), {"label": label, "subject": subject}
         
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
@@ -313,6 +325,7 @@ def build_train_val_split(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    transform = None
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
     """Builds the train/val/test split.
 
@@ -330,21 +343,24 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="train"
+        temporal_split="train",
+        transform = transform
     )
     val_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="val"
+        temporal_split="val",
+        transform = transform
     )
     test_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="test"
+        temporal_split="test",
+        transform = transform
     )
 
     train_subset = torch.utils.data.Subset(train_dataset, range(len(train_dataset)))
@@ -355,7 +371,8 @@ def build_train_val_split(
         root_dir, 
         sets_to_include=(set_id,), 
         window_size=window_size, 
-        stride=stride
+        stride=stride,
+        transform = transform
     )
 
     return full_dataset, train_subset, val_subset, test_subset
@@ -366,6 +383,7 @@ def build_zero_shot_test_set(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    transform = None
 ) -> DopplerTraceDataset:
     """Builds a test-only dataset.
 
@@ -379,4 +397,4 @@ def build_zero_shot_test_set(
         DopplerTraceDataset restricted to the requested set.
     """
 
-    return DopplerTraceDataset(root_dir, sets_to_include=(set_id,), window_size=window_size, stride=stride)
+    return DopplerTraceDataset(root_dir, sets_to_include=(set_id,), window_size=window_size, stride=stride, transform = transform)
