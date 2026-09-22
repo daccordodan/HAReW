@@ -209,7 +209,7 @@ class DopplerTraceDataset(Dataset):
         fig = create_spectrogram(
             window,
             sample_rate=170.0,
-            cmap="hot"
+            cmap="cold"
         )
         fig.savefig("test_spectrogram.png", dpi=150, bbox_inches="tight")
 
@@ -271,7 +271,9 @@ def create_spectrogram(
     _, nw, nd = doppler_window.shape
     duration = nw / sample_rate
 
-    fig, ax = plt.subplots(figsize=figsize)
+    figsize=(8,3*4)
+
+    fig, axes = plt.subplots(4, 1, figsize=figsize, sharex=True, sharey=True)
 
     # Normalize data if needed for visualization
     if vmin is None:
@@ -280,24 +282,28 @@ def create_spectrogram(
         vmax = doppler_window.max()
 
     # Display the spectrogram (transpose so time is on x-axis, velocity on y-axis)
-    im = ax.imshow(
-        doppler_window[1].T,
-        aspect="auto",
-        origin="lower",
-        cmap=cmap,
-        vmin=vmin,
-        vmax=vmax,
-        extent=[0, duration, 0, nd],
-        interpolation="nearest",
-    )
+    for i, ax in enumerate (axes):
+        im = ax.imshow(
+            doppler_window[i].T,
+            aspect="auto",
+            origin="lower",
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            extent=[0, duration, 0, nd],
+            interpolation="nearest",
+        )
 
-    ax.set_xlabel("time [s]", fontsize=11)
-    ax.set_ylabel("Doppler bin", fontsize=11)
+        ax.set_xlabel("time [s]", fontsize=11)
+        ax.set_ylabel("Doppler bin", fontsize=11)
+
+    axes[-1].set_xlabel("time [s]", fontsize=11)
+
     if title:
         ax.set_title(title, fontsize=12)
 
     # Add colorbar
-    cbar = plt.colorbar(im, ax=ax, label="Intensity")
+    plt.colorbar(im, ax=ax, label="Intensity")
 
     plt.tight_layout()
     return fig
