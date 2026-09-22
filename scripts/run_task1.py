@@ -60,6 +60,7 @@ def main(config_path: str) -> None:
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
     transform = DopplerTraceTransformation
+    print(transform)
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
