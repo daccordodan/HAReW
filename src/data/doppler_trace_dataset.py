@@ -138,7 +138,6 @@ class DopplerTraceDataset(Dataset):
         self.n_antennas = n_antennas
         self.temporal_split = temporal_split
         self.transform = transform
-        print(transform)
 
         self._recordings: list[np.ndarray] = []
         self._window_indices: list[tuple[int, int, int]] = []
@@ -217,7 +216,6 @@ class DopplerTraceDataset(Dataset):
         mm = input("ciao: pausa")
 
         if self.transform is not None:
-            print("is not none")
             sample1 = self.transform(window)
             fig = create_spectrogram(
                 sample1,
@@ -339,8 +337,6 @@ def build_train_val_split(
     Returns:
         (full_dataset, train_subset, val_subset, s1_test_subset).
     """
-
-    print(transform)
 
     train_dataset = DopplerTraceDataset(
         root_dir, 
