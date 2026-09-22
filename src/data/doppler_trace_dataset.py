@@ -19,6 +19,7 @@ from typing import Literal
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import matplotlib.pyplot as plt
 
 from src.data.label_mapping import is_in_scope, raw_to_class_index, SCENARIO_TO_SUBJECT
 
@@ -205,6 +206,14 @@ class DopplerTraceDataset(Dataset):
 
         window = self._recordings[rec_idx][:, start_time:end_time, :]
 
+        fig = create_spectrogram(
+            window,
+            sample_rate=170.0,
+            cmap="hot"
+        )
+
+        mm = input("ciao: pausa")
+
         if self.transform is not None:
             sample1 = self.transform(window)
             sample2 = self.transform(window)
@@ -213,28 +222,84 @@ class DopplerTraceDataset(Dataset):
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
     def evaluate_temp_split(self,min_len) -> tuple[int, int]:
-        """Evaluates the starting and ending index for the requested sets.
+            """Evaluates the starting and ending index for the requested sets.
 
-        Args:
-            min_len: Length of the shortest window.
-        """
-        if self.temporal_split != "all":
-            gap = self.window_size 
+            Args:
+                min_len: Length of the shortest window.
+            """
+            if self.temporal_split != "all":
+                gap = self.window_size 
 
-            train_end = int(min_len * 0.6)
-            val_start = train_end + gap
-            val_end = val_start + int(min_len * 0.2)
-            test_start = val_end + gap
+                train_end = int(min_len * 0.6)
+                val_start = train_end + gap
+                val_end = val_start + int(min_len * 0.2)
+                test_start = val_end + gap
 
-            if self.temporal_split == "train":
-                return 0, train_end
-            elif self.temporal_split == "val":
-                return val_start, val_end
-            elif self.temporal_split == "test":
-                return test_start, min_len
-        else:
-            return 0, min_len
+                if self.temporal_split == "train":
+                    return 0, train_end
+                elif self.temporal_split == "val":
+                    return val_start, val_end
+                elif self.temporal_split == "test":
+                    return test_start, min_len
+            else:
+                return 0, min_len
 
+def create_spectrogram(
+    doppler_window: np.ndarray,
+    sample_rate: float = 170.0,  # Doppler vectors per second (~2s for 340 vectors)
+    vmin: float | None = None,
+    vmax: float | None = None,
+    cmap: str = "hot",
+    title: str = "",
+    figsize: tuple[int, int] = (8, 5),
+) -> plt.Figure:
+    """Creates a spectrogram visualization of a Doppler trace window.
+
+    Args:
+        doppler_window: Array of shape (Nw, ND) where Nw is time steps and ND is velocity bins.
+        sample_rate: Doppler vectors per second (default: 170 for ~2s duration at Nw=340).
+        vmin: Minimum value for color scaling (default: data min).
+        vmax: Maximum value for color scaling (default: data max).
+        cmap: Matplotlib colormap name (default: "hot" for purple-to-yellow).
+        title: Figure title.
+        figsize: Figure size as (width, height) in inches.
+
+    Returns:
+        Matplotlib Figure object.
+    """
+    nw, nd = doppler_window.shape
+    duration = nw / sample_rate
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Normalize data if needed for visualization
+    if vmin is None:
+        vmin = doppler_window.min()
+    if vmax is None:
+        vmax = doppler_window.max()
+
+    # Display the spectrogram (transpose so time is on x-axis, velocity on y-axis)
+    im = ax.imshow(
+        doppler_window.T,
+        aspect="auto",
+        origin="lower",
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        extent=[0, duration, 0, nd],
+        interpolation="nearest",
+    )
+
+    ax.set_xlabel("time [s]", fontsize=11)
+    ax.set_ylabel("Doppler bin", fontsize=11)
+    if title:
+        ax.set_title(title, fontsize=12)
+
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax, label="Intensity")
+
+    plt.tight_layout()
+    return fig
 
 def build_train_val_split(
     root_dir: str | Path,
