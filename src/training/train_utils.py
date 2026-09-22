@@ -108,6 +108,7 @@ def load_checkpoint(model, optimizer, config, checkpoint_path):
     return epoch, val_acc, history
 
 def get_data_loaders(logger, config, set_id, transform=None):
+    print(transform)
     _, train_subset, val_subset, _ = build_train_val_split(
         Path(config["paths"]["doppler_traces_dir"]),
         set_id,
