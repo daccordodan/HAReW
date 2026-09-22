@@ -267,10 +267,10 @@ def create_spectrogram(
     Returns:
         Matplotlib Figure object.
     """
-    nw, nd = doppler_window.shape
+    _, nw, nd = doppler_window.shape
     duration = nw / sample_rate
 
-    _, fig, ax = plt.subplots(figsize=figsize)
+    fig, ax = plt.subplots(figsize=figsize)
 
     # Normalize data if needed for visualization
     if vmin is None:
@@ -280,7 +280,7 @@ def create_spectrogram(
 
     # Display the spectrogram (transpose so time is on x-axis, velocity on y-axis)
     im = ax.imshow(
-        doppler_window.T,
+        doppler_window[1].T,
         aspect="auto",
         origin="lower",
         cmap=cmap,
