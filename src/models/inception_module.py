@@ -71,4 +71,4 @@ class SimplifiedInceptionModule(nn.Module):
         a = self.branch_a(x)
         b = self.branch_b(x)
         c = self.branch_c(x)
-        return torch.cat([a, b, c], dim=1)
+        return torch.cat([c, b, a], dim=1)

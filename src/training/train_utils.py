@@ -111,7 +111,7 @@ def load_checkpoint(model, optimizer, config, checkpoint_path):
 
     return epoch, val_acc, history
 
-def get_data_loaders(logger, config, set_id):
+def get_data_loaders(logger, config, set_id, transform=None):
     loader_config = config["local_hardware"]
     num_workers = int(loader_config.get("num_workers", 0))
     pin_memory = bool(loader_config.get("pin_memory", False))
@@ -133,6 +133,7 @@ def get_data_loaders(logger, config, set_id):
         stride=config["doppler"].get("window_stride"),
         n_antennas=config["hardware"]["n_antennas"],
         logger=logger,
+        transform = transform
     )
     logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
 
