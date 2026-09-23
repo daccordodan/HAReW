@@ -43,8 +43,8 @@ def main(config_path: str) -> None:
     torch.backends.cudnn.enabled = False
 
     config = load_config(config_path)
-    torch_num_threads = config["hardware"].get("torch_num_threads")
-    torch_num_interop_threads = config["hardware"].get("torch_num_interop_threads")
+    torch_num_threads = config["local_hardware"].get("torch_num_threads")
+    torch_num_interop_threads = config["local_hardware"].get("torch_num_interop_threads")
     if torch_num_threads is not None:
         torch.set_num_threads(int(torch_num_threads))
     if torch_num_interop_threads is not None:
