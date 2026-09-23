@@ -53,6 +53,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
         set_id="S1",
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
+        n_antennas=config["hardware"]["n_antennas"],
     )
     s1_loader = DataLoader(s1_test_subset, batch_size=config["training"]["batch_size"], shuffle=False)
     y_true, y_pred = evaluate_set(model, s1_loader, device)
@@ -68,6 +69,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
             set_id=set_id,
             window_size=config["doppler"]["stacked_vectors_nw"],
             stride=config["doppler"].get("window_stride"),
+            n_antennas=config["hardware"]["n_antennas"],
         )
         test_loader = DataLoader(test_dataset, batch_size=config["training"]["batch_size"], shuffle=False)
         y_true, y_pred = evaluate_set(model, test_loader, device)

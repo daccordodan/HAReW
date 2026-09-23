@@ -267,6 +267,7 @@ def build_train_val_split(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    n_antennas: int = DEFAULT_NANT,
     logger: logging.Logger | None = None,
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
     """Builds the train/val/test split.
@@ -285,6 +286,7 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         temporal_split="train",
         logger=logger,
     )
@@ -293,6 +295,7 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         temporal_split="val",
         logger=logger,
     )
@@ -301,6 +304,7 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         temporal_split="test",
         logger=logger,
     )
@@ -314,6 +318,7 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         logger=logger,
     )
 
@@ -325,6 +330,7 @@ def build_zero_shot_test_set(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    n_antennas: int = DEFAULT_NANT,
 ) -> DopplerTraceDataset:
     """Builds a test-only dataset.
 
@@ -338,4 +344,10 @@ def build_zero_shot_test_set(
         DopplerTraceDataset restricted to the requested set.
     """
 
-    return DopplerTraceDataset(root_dir, sets_to_include=(set_id,), window_size=window_size, stride=stride)
+    return DopplerTraceDataset(
+        root_dir,
+        sets_to_include=(set_id,),
+        window_size=window_size,
+        stride=stride,
+        n_antennas=n_antennas,
+    )

@@ -106,13 +106,13 @@ def load_checkpoint(model, optimizer, config, checkpoint_path):
             checkpoint_path,
         )
     except EntryNotFoundError:
-        epoch=0
+        epoch=1
         val_acc = 0.0
 
     return epoch, val_acc, history
 
 def get_data_loaders(logger, config, set_id):
-    loader_config = config["hardware"]
+    loader_config = config["local_hardware"]
     num_workers = int(loader_config.get("num_workers", 0))
     pin_memory = bool(loader_config.get("pin_memory", False))
     persistent_workers = bool(
@@ -131,6 +131,7 @@ def get_data_loaders(logger, config, set_id):
         set_id,
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
+        n_antennas=config["hardware"]["n_antennas"],
         logger=logger,
     )
     logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
