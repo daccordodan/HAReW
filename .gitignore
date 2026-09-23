@@ -1,2 +1,5 @@
 docs/
 .venv/
+data/doppler_traces/
+
+__pycache__/
