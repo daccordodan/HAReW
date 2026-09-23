@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+from tqdm import tqdm
+
 import torch
 from torch.utils.data import DataLoader
+from multiprocessing import cpu_count
 from src.models.decision_fusion import fuse_batch
 from torch.nn.functional import softmax as softmax
 
@@ -47,6 +50,7 @@ def evaluate_with_fusion(model, val_loader, loss_fn, device):
     total_samples = 0
 
     with torch.no_grad():
+        tqdm(val_loader, desc="Validation", leave=False)
         for inputs, targets in val_loader:
             batch_size, Nant, Nw, ND = inputs.shape
             inputs_flat = inputs.view(batch_size * Nant, 1, Nw, ND).to(device)
@@ -108,18 +112,50 @@ def load_checkpoint(model, optimizer, config, checkpoint_path):
     return epoch, val_acc, history
 
 def get_data_loaders(logger, config, set_id):
+    loader_config = config["hardware"]
+    num_workers = int(loader_config.get("num_workers", 0))
+    pin_memory = bool(loader_config.get("pin_memory", False))
+    persistent_workers = bool(
+        loader_config.get("persistent_workers", False) and num_workers > 0
+    )
+    logger.info(
+        "Preparing data loaders: workers=%d (host CPUs=%d), pin_memory=%s, persistent_workers=%s",
+        num_workers,
+        cpu_count(),
+        pin_memory,
+        persistent_workers,
+    )
+
     _, train_subset, val_subset, _ = build_train_val_split(
         Path(config["paths"]["doppler_traces_dir"]),
         set_id,
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
+        logger=logger,
     )
     logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
 
-    train_loader = DataLoader(train_subset, batch_size=config["training"]["batch_size"], shuffle=True)
-    val_loader = DataLoader(val_subset, batch_size=config["training"]["batch_size"], shuffle=False)
+    train_loader = DataLoader(
+        train_subset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+    )
+    val_loader = DataLoader(
+        val_subset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+    )
 
-    return train_loader,val_loader
+    logger.info(
+        "Data loaders ready. Window tensors will be created lazily as batches are requested."
+    )
+    return train_loader, val_loader
 
 def update_checkpoints(logger, api, model, optimizer, config, epoch, val_acc, history, checkpoint_path, checkpoint_name):
     torch.save(
@@ -165,4 +201,3 @@ def plot_train_val_history(history, figures_dir: Path, figure_name):
     plt.legend()
     plt.savefig(figures_dir / figure_name, bbox_inches='tight', dpi=300)
     plt.show()
-
