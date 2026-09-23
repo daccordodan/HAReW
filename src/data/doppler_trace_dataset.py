@@ -19,6 +19,7 @@ from typing import Literal
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import matplotlib.pyplot as plt
 
 from src.data.label_mapping import is_in_scope, raw_to_class_index, SCENARIO_TO_SUBJECT
 
@@ -205,9 +206,31 @@ class DopplerTraceDataset(Dataset):
 
         window = self._recordings[rec_idx][:, start_time:end_time, :]
 
+        mm = input("ciao: pausa")
+
+        fig = create_spectrogram(
+            window,
+            sample_rate=170.0,
+            cmap="hot"
+        )
+        fig.savefig("test_spectrogram.png", dpi=150, bbox_inches="tight")
+
         if self.transform is not None:
-            sample = self.transform(window)
-            return (torch.tensor(window, dtype=torch.float32),torch.tensor(sample, dtype=torch.float32)), {"label": label, "subject": subject}
+            sample1 = self.transform(window)
+            fig = create_spectrogram(
+                sample1,
+                sample_rate=170.0,
+                cmap="hot"
+            )
+            fig.savefig("test_spectrogram_change1.png", dpi=150, bbox_inches="tight")
+            sample2 = self.transform(window)
+            fig = create_spectrogram(
+                sample2,
+                sample_rate=170.0,
+                cmap="hot"
+            )
+            fig.savefig("test_spectrogram_change2.png", dpi=150, bbox_inches="tight")
+            return (torch.tensor(sample1, dtype=torch.float32),torch.tensor(sample2, dtype=torch.float32)), {"label": label, "subject": subject}
         
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
@@ -234,12 +257,75 @@ class DopplerTraceDataset(Dataset):
         else:
             return 0, min_len
 
+def create_spectrogram(
+    doppler_window: np.ndarray,
+    sample_rate: float = 170.0,  # Doppler vectors per second (~2s for 340 vectors)
+    vmin: float | None = None,
+    vmax: float | None = None,
+    cmap: str = "hot",
+    title: str = "",
+    figsize: tuple[int, int] = (8, 5),
+) -> plt.Figure:
+    """Creates a spectrogram visualization of a Doppler trace window.
+
+    Args:
+        doppler_window: Array of shape (Nw, ND) where Nw is time steps and ND is velocity bins.
+        sample_rate: Doppler vectors per second (default: 170 for ~2s duration at Nw=340).
+        vmin: Minimum value for color scaling (default: data min).
+        vmax: Maximum value for color scaling (default: data max).
+        cmap: Matplotlib colormap name (default: "hot" for purple-to-yellow).
+        title: Figure title.
+        figsize: Figure size as (width, height) in inches.
+
+    Returns:
+        Matplotlib Figure object.
+    """
+    _, nw, nd = doppler_window.shape
+    duration = nw / sample_rate
+
+    figsize=(8,3*4)
+
+    fig, axes = plt.subplots(4, 1, figsize=figsize, sharex=True, sharey=True)
+
+    # Normalize data if needed for visualization
+    if vmin is None:
+        vmin = doppler_window.min()
+    if vmax is None:
+        vmax = doppler_window.max()
+
+    # Display the spectrogram (transpose so time is on x-axis, velocity on y-axis)
+    for i, ax in enumerate (axes):
+        im = ax.imshow(
+            doppler_window[i].T,
+            aspect="auto",
+            origin="lower",
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            extent=[0, duration, 0, nd],
+            interpolation="nearest",
+        )
+
+        ax.set_xlabel("time [s]", fontsize=11)
+        ax.set_ylabel("Doppler bin", fontsize=11)
+
+    axes[-1].set_xlabel("time [s]", fontsize=11)
+
+    if title:
+        ax.set_title(title, fontsize=12)
+
+    # Add colorbar
+    plt.colorbar(im, ax=ax, label="Intensity")
+
+    plt.tight_layout()
+    return fig
 
 def build_train_val_split(
     root_dir: str | Path,
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    transform = None
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
     """Builds the train/val/test split.
 
@@ -257,21 +343,24 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="train"
+        temporal_split="train",
+        transform = transform
     )
     val_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="val"
+        temporal_split="val",
+        transform = transform
     )
     test_dataset = DopplerTraceDataset(
         root_dir, 
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
-        temporal_split="test"
+        temporal_split="test",
+        transform = transform
     )
 
     train_subset = torch.utils.data.Subset(train_dataset, range(len(train_dataset)))
@@ -282,7 +371,8 @@ def build_train_val_split(
         root_dir, 
         sets_to_include=(set_id,), 
         window_size=window_size, 
-        stride=stride
+        stride=stride,
+        transform = transform
     )
 
     return full_dataset, train_subset, val_subset, test_subset
@@ -293,6 +383,7 @@ def build_zero_shot_test_set(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    transform = None
 ) -> DopplerTraceDataset:
     """Builds a test-only dataset.
 
@@ -306,4 +397,4 @@ def build_zero_shot_test_set(
         DopplerTraceDataset restricted to the requested set.
     """
 
-    return DopplerTraceDataset(root_dir, sets_to_include=(set_id,), window_size=window_size, stride=stride)
+    return DopplerTraceDataset(root_dir, sets_to_include=(set_id,), window_size=window_size, stride=stride, transform = transform)

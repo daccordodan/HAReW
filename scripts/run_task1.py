@@ -20,6 +20,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from src.models.sharp_classifier import SHARPClassifier
+from src.models.transform import dopplerTraceTransformation
 from src.data.label_mapping import TARGET_CLASSES
 from src.training.train_utils import flatten_antennas, evaluate_with_fusion, load_checkpoint, get_data_loaders, update_checkpoints, plot_train_val_history
 from src.utils.colab_utils import get_device
@@ -58,9 +59,11 @@ def main(config_path: str) -> None:
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
+    transform = dopplerTraceTransformation
+
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
-    train_loader,val_loader=get_data_loaders(logger, config, "S1")
+    train_loader,val_loader=get_data_loaders(logger, config, "S1", transform)
     start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
