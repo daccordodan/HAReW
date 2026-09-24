@@ -123,7 +123,7 @@ def evaluate_set(model: torch.nn.Module, dataloader: DataLoader, device: str) ->
         probs = torch.softmax(logits, dim=1).reshape(batch, n_ant, -1).cpu()
 
         fused = fuse_batch(probs, n_antennas=n_ant)
-        y_true.extend(batch_y.tolist())
+        y_true.extend(batch_y["label"].tolist())
         y_pred.extend(fused.tolist())
 
     return y_true, y_pred

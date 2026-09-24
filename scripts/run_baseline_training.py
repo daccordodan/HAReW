@@ -74,7 +74,7 @@ def main(config_path: str, local: bool = False) -> None:
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         logger.info("Starting training epoch %d/%d...", epoch, config["training"]["epochs"])
         train_loss, train_acc = run_epoch(
-            model, train_loader, loss_fn, device, optimizer, logger=logger
+            model, train_loader, loss_fn, device, optimizer
         )
         val_loss, val_acc = evaluate_with_fusion(model, val_loader, loss_fn, device)
         logger.info(
