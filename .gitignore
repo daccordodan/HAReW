@@ -1,6 +1,8 @@
 docs/
 .venv/
 data/doppler_traces/
+outputs/baseline/checkpoints/*
+outputs/baseline/figures/*
 
 __pycache__/
 notes/
