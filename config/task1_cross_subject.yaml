@@ -8,7 +8,6 @@ project:
 
 paths:
   doppler_traces_dir: "data/doppler_traces"          # same raw data source as baseline
-  baseline_checkpoint: "outputs/baseline/checkpoints/sharp_baseline_best.pt"  # read-only reference, not modified
   task_output_dir: "outputs/task1_cross_subject"
   colab_drive_subpath: null
   colab_drive_output_subpath: null
