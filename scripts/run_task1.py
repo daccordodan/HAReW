@@ -2,11 +2,6 @@
 
 Usage:
     python scripts/run_task1.py --config config/task1_cross_subject.yaml
-
-NOTE: this task's implementation is currently a scaffold (see
-src/tasks/task1_cross_subject/contrastive_encoder.py) pending design
-decisions on the augmentation/contrastive strategy -- running this will
-raise NotImplementedError until that work is done.
 """
 
 from __future__ import annotations
