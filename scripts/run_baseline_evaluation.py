@@ -13,6 +13,7 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
+import numpy as np
 
 from src.data.label_mapping import TARGET_CLASSES
 from src.data.doppler_trace_dataset import build_train_val_split, build_zero_shot_test_set
@@ -36,7 +37,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     """
     device = get_device()
     config = load_config(config_path)
-    model = load_checkpoint_to_model(config,checkpoint_name,device)
+    model = load_checkpoint_to_model(config,checkpoint_name,device,logger)
 
     data_root=Path(config["paths"]["doppler_traces_dir"])
     output_root=Path(config["paths"]["baseline_output_dir"])
