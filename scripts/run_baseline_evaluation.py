@@ -13,6 +13,7 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
+import numpy as np
 
 from src.data.label_mapping import TARGET_CLASSES
 from src.data.doppler_trace_dataset import build_train_val_split, build_zero_shot_test_set
@@ -36,7 +37,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     """
     device = get_device()
     config = load_config(config_path)
-    model = load_checkpoint_to_model(config,checkpoint_name,device)
+    model = load_checkpoint_to_model(config,checkpoint_name,device,logger)
 
     data_root=Path(config["paths"]["doppler_traces_dir"])
     output_root=Path(config["paths"]["baseline_output_dir"])
@@ -53,6 +54,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
         set_id="S1",
         window_size=config["doppler"]["stacked_vectors_nw"],
         stride=config["doppler"].get("window_stride"),
+        n_antennas=config["hardware"]["n_antennas"],
     )
     s1_loader = DataLoader(s1_test_subset, batch_size=config["training"]["batch_size"], shuffle=False)
     y_true, y_pred = evaluate_set(model, s1_loader, device)
@@ -68,6 +70,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
             set_id=set_id,
             window_size=config["doppler"]["stacked_vectors_nw"],
             stride=config["doppler"].get("window_stride"),
+            n_antennas=config["hardware"]["n_antennas"],
         )
         test_loader = DataLoader(test_dataset, batch_size=config["training"]["batch_size"], shuffle=False)
         y_true, y_pred = evaluate_set(model, test_loader, device)
