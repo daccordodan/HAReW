@@ -8,6 +8,9 @@ Usage (local or Colab):
 
 from __future__ import annotations
 
+from tqdm import tqdm
+import time
+
 import argparse
 import torch
 from torch import nn
@@ -34,7 +37,24 @@ def main(config_path: str) -> None:
         config_path: Path to config/base_config.yaml.
     """
     device = get_device()
+
+    # Disable MIOpen to bypass the broken backward convolution kernels 
+    # and force native rocBLAS math instead
+    torch.backends.cudnn.enabled = False
+
     config = load_config(config_path)
+    torch_num_threads = config["local_hardware"].get("torch_num_threads")
+    torch_num_interop_threads = config["local_hardware"].get("torch_num_interop_threads")
+    if torch_num_threads is not None:
+        torch.set_num_threads(int(torch_num_threads))
+    if torch_num_interop_threads is not None:
+        torch.set_num_interop_threads(int(torch_num_interop_threads))
+    logger.info(
+        "Using device=%s | torch threads=%d | interop threads=%d",
+        device,
+        torch.get_num_threads(),
+        torch.get_num_interop_threads(),
+    )
 
     output_root=Path(config["paths"]["baseline_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
@@ -50,15 +70,20 @@ def main(config_path: str) -> None:
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"]) # fused?
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
+    logger.info("Starting dataset parsing and recording loading...")
     train_loader,val_loader=get_data_loaders(logger, config, "S1")
+    logger.info("Dataset preparation complete.")
     start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
-        train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
+        logger.info("Starting training epoch %d/%d...", epoch, config["training"]["epochs"])
+        train_loss, train_acc = run_epoch(
+            model, train_loader, loss_fn, device, optimizer, logger=logger
+        )
         val_loss, val_acc = evaluate_with_fusion(model, val_loader, loss_fn, device)
         logger.info(
             "Epoch %d/%d | train_loss=%.4f train_acc=%.4f | val_loss=%.4f val_acc=%.4f",
@@ -86,39 +111,53 @@ def run_epoch(
     loss_fn: torch.nn.Module,
     device: str,
     optimizer: torch.optim.Optimizer | None = None,
+    logger=None,
 ) -> tuple[float, float]:
-    """Runs one epoch of training or evaluation.
-
-    Args:
-        model: SHARPClassifier.
-        dataloader: Yields (batch_x, batch_y) with batch_x shape (batch, Nant, Nw, ND).
-        loss_fn: Cross-entropy loss instance.
-        device: "cuda" or "cpu".
-        optimizer: runs backward()+step().
-
-    Returns:
-        (mean_loss, accuracy) for the epoch.
-    """
     model.train()
-
     total_loss, total_correct, total_count = 0.0, 0, 0
     context = torch.enable_grad()
 
+    pbar = tqdm(dataloader, desc="Training", leave=False)
+    t0 = time.perf_counter()
+    
     with context:
-        for batch_x, batch_y in dataloader:
+        for batch_x, batch_y in pbar:
+            data_time = time.perf_counter() - t0
+            
+            # Transfer to GPU
+            t1 = time.perf_counter()
             flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
-            flattened_x, flattened_y = flattened_x.to(device), flattened_y.to(device)
+            flattened_x, flattened_y = flattened_x.to(device, non_blocking=True), flattened_y.to(device, non_blocking=True)
+            torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
+            transfer_time = time.perf_counter() - t1
 
+            # Forward Pass
+            t2 = time.perf_counter()
             logits = model(flattened_x)
             loss = loss_fn(logits, flattened_y)
+            torch.cuda.synchronize()
+            forward_time = time.perf_counter() - t2
 
+            # Backward Pass
+            t3 = time.perf_counter()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            torch.cuda.synchronize()
+            backward_time = time.perf_counter() - t3
 
             total_loss += loss.item() * flattened_y.size(0)
             total_correct += (logits.argmax(dim=1) == flattened_y).sum().item()
             total_count += flattened_y.size(0)
+
+            # Update the progress bar with the live times!
+            pbar.set_postfix({
+                "loss": f"{loss.item():.4f}",
+                "data(s)": f"{data_time:.2f}",
+                "fwd(s)": f"{forward_time:.2f}",
+                "bwd(s)": f"{backward_time:.2f}"
+            })
+            t0 = time.perf_counter()
 
     return total_loss / total_count, total_correct / total_count
 

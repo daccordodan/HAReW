@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import pickle
 import re
+import time
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -117,7 +119,8 @@ class DopplerTraceDataset(Dataset):
         stride: int = DEFAULT_STRIDE,
         n_antennas: int = DEFAULT_NANT,
         temporal_split: Literal["train", "val", "test", "all"] = "all",
-        transform = None
+        transform = None,
+        logger: logging.Logger | None = None,
     ) -> None:
         """Indexes and windows all in-scope samples for the requested sets
         and creates training, validation and test sets from the original set.
@@ -137,6 +140,7 @@ class DopplerTraceDataset(Dataset):
         self.n_antennas = n_antennas
         self.temporal_split = temporal_split
         self.transform = transform
+        self.logger = logger
 
         self._recordings: list[np.ndarray] = []
         self._window_indices: list[tuple[int, int, int]] = []
@@ -147,6 +151,14 @@ class DopplerTraceDataset(Dataset):
         self._build_index()
 
     def _build_index(self) -> None:
+        started_at = time.perf_counter()
+        if self.logger is not None:
+            self.logger.info(
+                "Parsing %s dataset files for sets=%s (split=%s)...",
+                self.root_dir,
+                ",".join(self.sets_to_include),
+                self.temporal_split,
+            )
         all_files=discover_stream_files(self.root_dir)
         
         groups: dict[tuple[str, str, str], dict[int, Path]] = {} # This was to group files by (set_id, repetition, activity_code) -> {antenna_idx: path}
@@ -176,6 +188,7 @@ class DopplerTraceDataset(Dataset):
             per_antenna_streams = [s[start_idx:end_idx] for s in per_antenna_streams]
             stacked_recording = np.stack([s[:min_len] for s in per_antenna_streams], axis=0)
             rec_idx = len(self._recordings)
+            
             self._recordings.append(stacked_recording)
 
             class_idx = raw_to_class_index(activity_code)
@@ -186,6 +199,16 @@ class DopplerTraceDataset(Dataset):
             for w in range(n_windows):
                 start_time = w * self.stride
                 self._window_indices.append((rec_idx, start_time, class_idx, subject))
+
+        if self.logger is not None:
+            elapsed = time.perf_counter() - started_at
+            self.logger.info(
+                "Finished loading %s split: %d recordings, %d windows in %.2fs",
+                self.temporal_split,
+                len(self._recordings),
+                len(self._window_indices),
+                elapsed,
+            )
 
     def __len__(self) -> int:
         return len(self._window_indices)
@@ -240,6 +263,8 @@ def build_train_val_split(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    n_antennas: int = DEFAULT_NANT,
+    logger: logging.Logger | None = None,
     transform = None
 ) -> tuple[DopplerTraceDataset, torch.utils.data.Subset, torch.utils.data.Subset, torch.utils.data.Subset]:
     """Builds the train/val/test split.
@@ -258,7 +283,9 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         temporal_split="train",
+        logger=logger,
         transform = transform
     )
     val_dataset = DopplerTraceDataset(
@@ -266,7 +293,9 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         temporal_split="val",
+        logger=logger,
         transform = transform
     )
     test_dataset = DopplerTraceDataset(
@@ -274,7 +303,9 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
         temporal_split="test",
+        logger=logger,
         transform = transform
     )
 
@@ -287,6 +318,8 @@ def build_train_val_split(
         sets_to_include=(set_id,), 
         window_size=window_size, 
         stride=stride,
+        n_antennas=n_antennas,
+        logger=logger,
         transform = transform
     )
 
@@ -298,6 +331,7 @@ def build_zero_shot_test_set(
     set_id: Literal["S1","S2", "S3", "S4", "S5", "S6", "S7"],
     window_size: int = DEFAULT_NW,
     stride: int = DEFAULT_STRIDE,
+    n_antennas: int = DEFAULT_NANT,
     transform = None
 ) -> DopplerTraceDataset:
     """Builds a test-only dataset.
@@ -312,4 +346,11 @@ def build_zero_shot_test_set(
         DopplerTraceDataset restricted to the requested set.
     """
 
-    return DopplerTraceDataset(root_dir, sets_to_include=(set_id,), window_size=window_size, stride=stride, transform = transform)
+    return DopplerTraceDataset(
+        root_dir,
+        sets_to_include=(set_id,),
+        window_size=window_size,
+        stride=stride,
+        n_antennas=n_antennas,
+        transform = transform
+    )
