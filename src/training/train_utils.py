@@ -39,11 +39,9 @@ def run_epoch(
             data_time = time.perf_counter() - t0
             
             # Transfer to GPU
-            t1 = time.perf_counter()
             flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
             flattened_x, flattened_y = flattened_x.to(device, non_blocking=True), flattened_y.to(device, non_blocking=True)
             torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
-            transfer_time = time.perf_counter() - t1
 
             # Forward Pass
             t2 = time.perf_counter()

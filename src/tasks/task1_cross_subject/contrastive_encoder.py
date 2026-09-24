@@ -29,6 +29,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+import time
 from tqdm import tqdm
 
 
@@ -150,23 +151,42 @@ def train_contrastive_pretraining(
 
     total_loss, total_count = 0.0, 0
     context = torch.enable_grad()
+    pbar = tqdm(dataloader, desc="Training", leave=False)
+    t0 = time.perf_counter()
 
     with context:
-        for batch_x, batch_y in dataloader:
+        for batch_x, batch_y in pbar:
+            data_time = time.perf_counter() - t0
+
             flattened_x1, _ = flatten_antennas(batch_x[0], batch_y["label"])
             flattened_x2, _ = flatten_antennas(batch_x[1], batch_y["label"])
             flattened_x1, flattened_x2 = flattened_x1.to(device), flattened_x2.to(device)
+            torch.cuda.synchronize()
 
+            t2 = time.perf_counter()
             logits1 = model(flattened_x1)
             logits2 = model(flattened_x2)
             loss = loss_fn(logits1, logits2)
+            torch.cuda.synchronize()
+            forward_time = time.perf_counter() - t2
 
+            t3 = time.perf_counter()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            torch.cuda.synchronize()
+            backward_time = time.perf_counter() - t3
 
             total_loss += loss.item() * flattened_x1.size(0)
             total_count += flattened_x1.size(0)
+
+            pbar.set_postfix({
+                "loss": f"{loss.item():.4f}",
+                "data(s)": f"{data_time:.2f}",
+                "fwd(s)": f"{forward_time:.2f}",
+                "bwd(s)": f"{backward_time:.2f}"
+            })
+            t0 = time.perf_counter()
 
     return total_loss / total_count
 
