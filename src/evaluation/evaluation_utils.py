@@ -16,7 +16,7 @@ from src.models.sharp_classifier import SHARPClassifier
 
 from huggingface_hub import hf_hub_download
 
-def load_checkpoint_to_model(config,checkpoint_name,device):
+def load_checkpoint_to_model(config,checkpoint_name,device,logger):
     model=SHARPClassifier(
         n_classes=len(TARGET_CLASSES),
         nw=config["doppler"]["stacked_vectors_nw"],
