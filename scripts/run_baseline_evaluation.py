@@ -28,7 +28,7 @@ S7_REFERENCE_ACCURACY = 0.9599 # For comparison with the paper
 
 logger = get_logger(__name__)
 
-def main(config_path: str, checkpoint_name: str) -> None:
+def main(config_path: str, checkpoint_name: str, local: bool = False) -> None:
     """Entry point: loads a trained checkpoint and evaluates across all scenarios.
 
     Args:
@@ -37,7 +37,7 @@ def main(config_path: str, checkpoint_name: str) -> None:
     """
     device = get_device()
     config = load_config(config_path)
-    model = load_checkpoint_to_model(config,checkpoint_name,device,logger)
+    model = load_checkpoint_to_model(config, checkpoint_name, device, logger, local=local)
 
     data_root=Path(config["paths"]["doppler_traces_dir"])
     output_root=Path(config["paths"]["baseline_output_dir"])
@@ -132,5 +132,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate the SHARP baseline.")
     parser.add_argument("--config", type=str, default="config/base_config.yaml")
     parser.add_argument("--checkpoint", type=str, default="sharp_baseline_best.pt")
+    parser.add_argument("--local", action="store_true", help="Load the checkpoint from local disk.")
     args = parser.parse_args()
-    main(args.config, args.checkpoint)
+    main(args.config, args.checkpoint, local=args.local)

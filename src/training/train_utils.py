@@ -17,7 +17,6 @@ from src.data.label_mapping import TARGET_CLASSES
 from pathlib import Path
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
-
 import matplotlib.pyplot as plt
 
 
@@ -74,7 +73,7 @@ def evaluate_with_fusion(model, val_loader, loss_fn, device):
     return avg_loss, fused_acc
 
 
-def load_checkpoint(model, optimizer, config, checkpoint_path):
+def load_checkpoint(model, optimizer, config, checkpoint_path, local=False):
     history = {
         "epoch": [],
         "train_loss": [],
@@ -82,32 +81,32 @@ def load_checkpoint(model, optimizer, config, checkpoint_path):
         "val_acc": []
     }
     
-    try:
-        checkpoint=torch.load(hf_hub_download(
-            repo_id="danieledaccordo/HAReW",
-            filename="checkpoints_dir/sharp_baseline_best.pt",
-            repo_type="model"
-        ))
+    if local and checkpoint_path.exists():
+        checkpoint = torch.load(checkpoint_path, map_location="cpu")
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         epoch=checkpoint["epoch"]+1
         val_acc=checkpoint["val_acc"]
         history=checkpoint["history"]
-        torch.save(
-            {
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "config": config,
-                "epoch": epoch,
-                "class_names": list(TARGET_CLASSES),
-                "val_acc" : val_acc,
-                "history": history
-            },
-            checkpoint_path,
-        )
-    except EntryNotFoundError:
+    elif local:
         epoch=1
         val_acc = 0.0
+    else:
+        try:
+            checkpoint = torch.load(hf_hub_download(
+                repo_id="danieledaccordo/HAReW",
+                filename="checkpoints_dir/sharp_baseline_best.pt",
+                repo_type="model",
+            ), map_location="cpu")
+            model.load_state_dict(checkpoint["model_state_dict"])
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            epoch=checkpoint["epoch"]+1
+            val_acc=checkpoint["val_acc"]
+            history=checkpoint["history"]
+            torch.save(checkpoint, checkpoint_path)
+        except EntryNotFoundError:
+            epoch=1
+            val_acc = 0.0
 
     return epoch, val_acc, history
 
@@ -159,7 +158,10 @@ def get_data_loaders(logger, config, set_id, transform=None):
     )
     return train_loader, val_loader
 
-def update_checkpoints(logger, api, model, optimizer, config, epoch, val_acc, history, checkpoint_path, checkpoint_name):
+def update_checkpoints(
+    logger, api, model, optimizer, config, epoch, val_acc, history,
+    checkpoint_path, checkpoint_name, local=False
+):
     torch.save(
         {
             "model_state_dict": model.state_dict(),
@@ -173,13 +175,14 @@ def update_checkpoints(logger, api, model, optimizer, config, epoch, val_acc, hi
         checkpoint_path,
     )
     logger.info("Saved new best checkpoint (val_acc=%.4f) -> %s", val_acc, checkpoint_path)
-    api.upload_file(
-        path_or_fileobj=checkpoint_path,
-        path_in_repo="checkpoints_dir/"+checkpoint_name,
-        repo_id="danieledaccordo/HAReW",
-        repo_type="model"
-    )
-    logger.info("Uploaded new best checkpoint to Hugging Face")
+    if not local:
+        api.upload_file(
+            path_or_fileobj=checkpoint_path,
+            path_in_repo="checkpoints_dir/" + checkpoint_name,
+            repo_id="danieledaccordo/HAReW",
+            repo_type="model",
+        )
+        logger.info("Uploaded new best checkpoint to Hugging Face")
 
 def plot_train_val_history(history, figures_dir: Path, figure_name):
     plt.figure(figsize=(8,5))
