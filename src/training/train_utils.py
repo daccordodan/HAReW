@@ -19,7 +19,6 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
 import matplotlib.pyplot as plt
 
-
 def flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
 
