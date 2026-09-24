@@ -85,7 +85,7 @@ class ContrastiveEncoder(nn.Module):
         self.projector = nn.Sequential(
             nn.Linear(reduced_channels * self.pooled_nw * self.pooled_nd, hidden_dim),
             nn.ReLU(),
-            nn.Linear(reduced_channels * self.pooled_nw * self.pooled_nd, projection_dim)
+            nn.Linear(hidden_dim, projection_dim)
         )
         
 
@@ -177,7 +177,7 @@ def evaluate_encoder(model, val_loader, loss_fn, device):
     with torch.no_grad():
         tqdm(val_loader, desc="Validation", leave=False)
         for inputs, _ in val_loader:
-            batch_size, Nant, Nw, ND = inputs.shape
+            batch_size, Nant, Nw, ND = inputs[0].shape
             inputs_flat_1 = inputs[0].view(batch_size * Nant, 1, Nw, ND).to(device)
             inputs_flat_2 = inputs[1].view(batch_size * Nant, 1, Nw, ND).to(device)
 

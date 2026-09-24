@@ -62,14 +62,19 @@ def main(config_path: str, local: bool = False) -> None:
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", contrastive_enc.count_parameters())
 
+    logger.info("Starting dataset parsing and recording loading...")
     train_loader,val_loader=get_data_loaders(logger, config, "S1", transform)
+    logger.info("Dataset preparation complete.")
     start_epoch, best_val_loss, history=load_checkpoint(
         contrastive_enc, optimizer, config, checkpoint_path, local=local
     )
+    val_acc = 0
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
-        train_loss = train_contrastive_pretraining(contrastive_enc, train_loader, loss_fn, device, optimizer)
-        val_acc = 0
+        logger.info("Starting training epoch %d/%d...", epoch, config["training"]["epochs"])
+        train_loss = train_contrastive_pretraining(
+            contrastive_enc, train_loader, loss_fn, device, optimizer
+        )
         val_loss = evaluate_encoder(contrastive_enc, val_loader, loss_fn, device)
         logger.info(
             "Epoch %d/%d | train_loss=%.4f | val_loss=%.4f",
@@ -96,7 +101,7 @@ def main(config_path: str, local: bool = False) -> None:
 
     freeze(contrastive_enc)
     loss_fn=nn.CrossEntropyLoss()
-    train_loader,val_loader=get_data_loaders(logger, config, "S1", transform)
+    train_loader,val_loader=get_data_loaders(logger, config, "S1")
 
     classifier = nn.Linear(contrastive_enc.reduced_channels * contrastive_enc.pooled_nw * contrastive_enc.pooled_nd, n_classes)
     HAReW_model= FineTunedModel(
@@ -133,7 +138,7 @@ def main(config_path: str, local: bool = False) -> None:
                 checkpoint_path, checkpoint_name, local=local
             )
 
-    figure_name="train_validation_over_epoch_baseline.png"
+    figure_name="train_validation_over_epoch_task1.png"
     figures_dir = output_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
     plot_train_val_history(history, figures_dir, figure_name)
@@ -165,22 +170,21 @@ def run_epoch(
 
     with context:
         for batch_x, batch_y in dataloader:
-            flattened_x1, flattened_y = flatten_antennas(batch_x[0], batch_y["label"])
-            flattened_x2, _ = flatten_antennas(batch_x[1], batch_y["label"])
+            flattened_x1, flattened_y = flatten_antennas(batch_x, batch_y["label"])
             flattened_x1, flattened_x2, flattened_y = flattened_x1.to(device), flattened_x2.to(device), flattened_y.to(device)
 
-            logits1 = model(flattened_x1)
-            logits2 = model(flattened_x2)
-            loss = loss_fn(logits1, logits2, flattened_y)
+            logits = model(flattened_x1)
+            loss = loss_fn(logits, flattened_y)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item() * flattened_y.size(0)
+            total_correct += (logits.argmax(dim=1) == flattened_y).sum().item()
             total_count += flattened_y.size(0)
 
-    return total_loss / total_count
+    return total_loss / total_count, 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Task 1: cross-subject contrastive pretraining.")
