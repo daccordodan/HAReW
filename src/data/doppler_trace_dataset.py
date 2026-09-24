@@ -229,7 +229,8 @@ class DopplerTraceDataset(Dataset):
 
         window = self._recordings[rec_idx][:, start_time:end_time, :]
 
-        mm = input("ciao: pausa")
+        # mm = input("ciao: pausa")
+
 
         fig = create_spectrogram(
             window,
