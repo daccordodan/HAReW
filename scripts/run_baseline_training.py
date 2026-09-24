@@ -8,17 +8,12 @@ Usage (local or Colab):
 
 from __future__ import annotations
 
-from tqdm import tqdm
-import time
-
 import argparse
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
 
 from src.models.sharp_classifier import SHARPClassifier
-from src.data.label_mapping import TARGET_CLASSES
-from src.training.train_utils import flatten_antennas, evaluate_with_fusion, load_checkpoint, get_data_loaders, update_checkpoints, plot_train_val_history
+from src.training.train_utils import run_epoch, evaluate_with_fusion, load_checkpoint, get_data_loaders, update_checkpoints, plot_train_val_history
 from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
@@ -60,7 +55,7 @@ def main(config_path: str, local: bool = False) -> None:
     checkpoint_path = checkpoints_dir / checkpoint_name
 
     model = SHARPClassifier(
-        n_classes=len(TARGET_CLASSES),
+        n_classes=config["model"]["n_classes_primary"],
         nw=config["doppler"]["stacked_vectors_nw"],
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
@@ -104,62 +99,6 @@ def main(config_path: str, local: bool = False) -> None:
     figures_dir.mkdir(parents=True, exist_ok=True)
     plot_train_val_history(history, figures_dir, figure_name)
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
-
-def run_epoch(
-    model: torch.nn.Module,
-    dataloader: DataLoader,
-    loss_fn: torch.nn.Module,
-    device: str,
-    optimizer: torch.optim.Optimizer | None = None,
-    logger=None,
-) -> tuple[float, float]:
-    model.train()
-    total_loss, total_correct, total_count = 0.0, 0, 0
-    context = torch.enable_grad()
-
-    pbar = tqdm(dataloader, desc="Training", leave=False)
-    t0 = time.perf_counter()
-    
-    with context:
-        for batch_x, batch_y in pbar:
-            data_time = time.perf_counter() - t0
-            
-            # Transfer to GPU
-            t1 = time.perf_counter()
-            flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
-            flattened_x, flattened_y = flattened_x.to(device, non_blocking=True), flattened_y.to(device, non_blocking=True)
-            torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
-            transfer_time = time.perf_counter() - t1
-
-            # Forward Pass
-            t2 = time.perf_counter()
-            logits = model(flattened_x)
-            loss = loss_fn(logits, flattened_y)
-            torch.cuda.synchronize()
-            forward_time = time.perf_counter() - t2
-
-            # Backward Pass
-            t3 = time.perf_counter()
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            torch.cuda.synchronize()
-            backward_time = time.perf_counter() - t3
-
-            total_loss += loss.item() * flattened_y.size(0)
-            total_correct += (logits.argmax(dim=1) == flattened_y).sum().item()
-            total_count += flattened_y.size(0)
-
-            # Update the progress bar with the live times!
-            pbar.set_postfix({
-                "loss": f"{loss.item():.4f}",
-                "data(s)": f"{data_time:.2f}",
-                "fwd(s)": f"{forward_time:.2f}",
-                "bwd(s)": f"{backward_time:.2f}"
-            })
-            t0 = time.perf_counter()
-
-    return total_loss / total_count, total_correct / total_count
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the SHARP baseline.")

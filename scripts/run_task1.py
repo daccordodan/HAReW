@@ -15,13 +15,11 @@ import argparse
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 
 from src.tasks.task1_cross_subject.contrastive_encoder import ContrastiveEncoder, FineTunedModel, evaluate_encoder, train_contrastive_pretraining, freeze
 from src.models.transform import dopplerTraceTransformation
 from src.models.losses import NTXentLoss
-from src.data.label_mapping import TARGET_CLASSES
-from src.training.train_utils import evaluate_with_fusion, flatten_antennas, load_checkpoint, get_data_loaders, update_checkpoints, plot_train_val_history
+from src.training.train_utils import run_epoch, evaluate_with_fusion, load_checkpoint, get_data_loaders, update_checkpoints, plot_train_val_history
 from src.utils.colab_utils import get_device
 from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
@@ -143,48 +141,6 @@ def main(config_path: str, local: bool = False) -> None:
     figures_dir.mkdir(parents=True, exist_ok=True)
     plot_train_val_history(history, figures_dir, figure_name)
     logger.info("Training complete. Best val_acc=%.4f", best_val_acc)
-
-def run_epoch(
-    model: torch.nn.Module,
-    dataloader: DataLoader,
-    loss_fn: torch.nn.Module,
-    device: str,
-    optimizer: torch.optim.Optimizer | None = None,
-) -> tuple[float, float]:
-    """Runs one epoch of training or evaluation.
-
-    Args:
-        model: SHARPClassifier.
-        dataloader: Yields (batch_x, batch_y) with batch_x shape (batch, Nant, Nw, ND).
-        loss_fn: Used loss function.
-        device: "cuda" or "cpu".
-        optimizer: runs backward()+step().
-
-    Returns:
-        (mean_loss, accuracy) for the epoch.
-    """
-    model.train()
-
-    total_loss, total_count = 0.0, 0
-    context = torch.enable_grad()
-
-    with context:
-        for batch_x, batch_y in dataloader:
-            flattened_x1, flattened_y = flatten_antennas(batch_x, batch_y["label"])
-            flattened_x1, flattened_x2, flattened_y = flattened_x1.to(device), flattened_x2.to(device), flattened_y.to(device)
-
-            logits = model(flattened_x1)
-            loss = loss_fn(logits, flattened_y)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            total_loss += loss.item() * flattened_y.size(0)
-            total_correct += (logits.argmax(dim=1) == flattened_y).sum().item()
-            total_count += flattened_y.size(0)
-
-    return total_loss / total_count, 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Task 1: cross-subject contrastive pretraining.")

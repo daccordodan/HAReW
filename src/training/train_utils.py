@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import time
 from tqdm import tqdm
 
 import torch
@@ -19,6 +20,60 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
 import matplotlib.pyplot as plt
 
+def run_epoch(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    loss_fn: torch.nn.Module,
+    device: str,
+    optimizer: torch.optim.Optimizer | None = None
+) -> tuple[float, float]:
+    model.train()
+    total_loss, total_correct, total_count = 0.0, 0, 0
+    context = torch.enable_grad()
+
+    pbar = tqdm(dataloader, desc="Training", leave=False)
+    t0 = time.perf_counter()
+    
+    with context:
+        for batch_x, batch_y in pbar:
+            data_time = time.perf_counter() - t0
+            
+            # Transfer to GPU
+            t1 = time.perf_counter()
+            flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
+            flattened_x, flattened_y = flattened_x.to(device, non_blocking=True), flattened_y.to(device, non_blocking=True)
+            torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
+            transfer_time = time.perf_counter() - t1
+
+            # Forward Pass
+            t2 = time.perf_counter()
+            logits = model(flattened_x)
+            loss = loss_fn(logits, flattened_y)
+            torch.cuda.synchronize()
+            forward_time = time.perf_counter() - t2
+
+            # Backward Pass
+            t3 = time.perf_counter()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            torch.cuda.synchronize()
+            backward_time = time.perf_counter() - t3
+
+            total_loss += loss.item() * flattened_y.size(0)
+            total_correct += (logits.argmax(dim=1) == flattened_y).sum().item()
+            total_count += flattened_y.size(0)
+
+            # Update the progress bar with the live times!
+            pbar.set_postfix({
+                "loss": f"{loss.item():.4f}",
+                "data(s)": f"{data_time:.2f}",
+                "fwd(s)": f"{forward_time:.2f}",
+                "bwd(s)": f"{backward_time:.2f}"
+            })
+            t0 = time.perf_counter()
+
+    return total_loss / total_count, total_correct / total_count
 
 def flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
