@@ -1,9 +1,9 @@
-"""CLI: evaluates the trained SHARP baseline across sets S1-S7 (PyTorch).
+"""CLI: evaluates the trained task 1 across sets S1-S7 (PyTorch).
 
 Usage (local or Colab):
-    python scripts/run_baseline_evaluation.py \\
+    python scripts/run_task1_evaluation.py \\
         --config config/base_config.yaml \\
-        --checkpoint sharp_baseline_best.pt
+        --checkpoint training_t13_best.pt
 """
 
 from __future__ import annotations
@@ -11,10 +11,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from src.models.sharp_classifier import SHARPClassifier
+
 import torch
-from torch.utils.data import DataLoader
+import torch.nn as nn
 import numpy as np
+from torch.utils.data import DataLoader
+
+from src.tasks.task1_cross_subject.contrastive_encoder import ContrastiveEncoder, FineTunedModel
 
 from src.data.label_mapping import TARGET_CLASSES
 from src.data.doppler_trace_dataset import build_train_val_split, build_zero_shot_test_set
@@ -24,8 +27,6 @@ from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 from src.evaluation.evaluation_utils import load_checkpoint_to_model, plot_acc_f1_results_pa, plot_conf_mat_results_pa, write_report_performances
 from src.models.decision_fusion import fuse_batch
-
-S7_REFERENCE_ACCURACY = 0.9599 # For comparison with the paper
 
 logger = get_logger(__name__)
 
@@ -38,15 +39,19 @@ def main(config_path: str, checkpoint_name: str, local: bool = False) -> None:
     """
     device = get_device()
     config = load_config(config_path)
-    model=SHARPClassifier(
-        n_classes=len(TARGET_CLASSES),
+    contrastive_enc = ContrastiveEncoder(
         nw=config["doppler"]["stacked_vectors_nw"],
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
+    classifier = nn.Linear(contrastive_enc.reduced_channels * contrastive_enc.pooled_nw * contrastive_enc.pooled_nd, n_classes)
+    model= FineTunedModel(
+        contrastive_enc,
+        classifier
+    )
     model = load_checkpoint_to_model(config, model, checkpoint_name, device, logger, local=local)
 
     data_root=Path(config["paths"]["doppler_traces_dir"])
-    output_root=Path(config["paths"]["baseline_output_dir"])
+    output_root=Path(config["paths"]["task_output_dir"])
 
     accuracy_by_set: dict[str, float] = {}
     accuracy_by_set_pa: dict[str, dict[str, float]] = {}
@@ -87,12 +92,6 @@ def main(config_path: str, checkpoint_name: str, local: bool = False) -> None:
     logger.info("=== Per-set accuracy (fused, decision-level) ===")
     for set_id, acc in accuracy_by_set.items():
         logger.info("  %s: %.4f", set_id, acc)
-
-    if "S7" in accuracy_by_set:
-        logger.info(
-            "S7 vs. paper reference: measured=%.4f, paper=%.4f, diff=%.4f",
-            accuracy_by_set["S7"], S7_REFERENCE_ACCURACY, accuracy_by_set["S7"] - S7_REFERENCE_ACCURACY,
-        )
 
     figures_dir = output_root / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -135,9 +134,9 @@ def evaluate_set(model: torch.nn.Module, dataloader: DataLoader, device: str) ->
     return y_true, y_pred
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate the SHARP baseline.")
+    parser = argparse.ArgumentParser(description="Evaluate the task 1.")
     parser.add_argument("--config", type=str, default="config/base_config.yaml")
-    parser.add_argument("--checkpoint", type=str, default="sharp_baseline_best.pt")
+    parser.add_argument("--checkpoint", type=str, default="training_t13_best.pt")
     parser.add_argument("--local", action="store_true", help="Load the checkpoint from local disk.")
     args = parser.parse_args()
     main(args.config, args.checkpoint, local=args.local)

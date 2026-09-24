@@ -23,11 +23,27 @@ intentionally left unimplemented until that phase is scoped in detail
 
 from __future__ import annotations
 
+from src.training.train_utils import flatten_antennas
+
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
+
+import time
+from tqdm import tqdm
+
 
 from src.models.inception_module import SimplifiedInceptionModule
 
+class FineTunedModel(nn.Module):
+    def __init__(self, encoder, classifier):
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = classifier
+        
+    def forward(self, doppler_trace):
+        features = self.encoder(doppler_trace, extract_features=True)
+        return self.classifier(features)
 
 class ContrastiveEncoder(nn.Module):
     """Encoder used for contrastive pretraining on Doppler traces.
@@ -40,11 +56,13 @@ class ContrastiveEncoder(nn.Module):
 
     def __init__(
         self,
-        n_classes: int = 5, # E, W, R, J, L
         nw: int = 340,
         nd: int = 100,
         reduced_channels: int = 3,
         dropout_rate: float = 0.2,
+        projection_dim: int = 128,
+        hidden_dim: int = 1024,
+        extract_features: bool = False
     ) -> None:
         """Initializes the classifier.
 
@@ -56,14 +74,23 @@ class ContrastiveEncoder(nn.Module):
             dropout_rate: Dropout probability before the final dense layer.
         """
         super().__init__()
+        self.extract_features = extract_features
         self.feature_extractor = SimplifiedInceptionModule(in_channels=1)
         self.reduction_conv = nn.Conv2d(self.feature_extractor.out_channels, reduced_channels, kernel_size=1)
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout(p=dropout_rate)
-        pooled_nw, pooled_nd = nw // 2, nd // 2
-        self.classifier_head = nn.Linear(reduced_channels * pooled_nw * pooled_nd, n_classes)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.reduced_channels=reduced_channels
+        self.pooled_nw, self.pooled_nd = nw // 2, nd // 2
+
+        self.projector = nn.Sequential(
+            nn.Linear(reduced_channels * self.pooled_nw * self.pooled_nd, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, projection_dim)
+        )
+        
+
+    def forward(self, doppler_trace: torch.Tensor) -> torch.Tensor:
         """Encodes a Doppler trace into the contrastive embedding space.
 
         Args:
@@ -72,13 +99,122 @@ class ContrastiveEncoder(nn.Module):
         Returns:
             Embedding of shape (batch, projection_dim).
         """
-        raise NotImplementedError("TODO: implement forward pass once head is defined.")
 
+        features = self.feature_extractor(doppler_trace)  # (batch, 15, Nw/2, ND/2)
+        reduced = self.relu(self.reduction_conv(features))  # (batch, 3, Nw/2, ND/2)
+        flattened = torch.flatten(reduced, start_dim=1)
+        dropped = self.dropout(flattened)
 
-def train_contrastive_pretraining(config_path: str) -> None:
-    """Entry point for the contrastive pretraining stage.
+        if self.extract_features:
+            return dropped
+
+        return self.projector(dropped)
+
+    def count_parameters(self) -> int:
+            """Returns the total trainable parameter count, for comparison."""
+            return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+def freeze(model):
+    for param in model.feature_extractor.branch_a:
+        param.requires_grad = False
+    for param in model.feature_extractor.branch_b:
+        param.requires_grad = False
+    for param in model.feature_extractor.branch_c:
+        param.requires_grad = False
+    for param in model.reduction_conv:
+        param.requires_grad = False
+    for param in model.relu:
+        param.requires_grad = False
+    for param in model.dropout:
+        param.requires_grad = False
+
+def train_contrastive_pretraining(    
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    loss_fn: torch.nn.Module,
+    device: str,
+    optimizer: torch.optim.Optimizer | None = None,
+) -> tuple[float, float]:
+    """Runs one epoch of training or evaluation.
 
     Args:
-        config_path: Path to config/task1_cross_subject.yaml.
+        model: SHARPClassifier.
+        dataloader: Yields (batch_x, batch_y) with batch_x shape (batch, Nant, Nw, ND).
+        loss_fn: Used loss function.
+        device: "cuda" or "cpu".
+        optimizer: runs backward()+step().
+
+    Returns:
+        (mean_loss, accuracy) for the epoch.
     """
-    raise NotImplementedError("TODO: implement once augmentation/loss strategy is decided.")
+    model.train()
+
+    total_loss, total_count = 0.0, 0
+    context = torch.enable_grad()
+    pbar = tqdm(dataloader, desc="Training", leave=False)
+    t0 = time.perf_counter()
+
+    with context:
+        for batch_x, batch_y in pbar:
+            data_time = time.perf_counter() - t0
+
+            flattened_x1, _ = flatten_antennas(batch_x[0], batch_y["label"])
+            flattened_x2, _ = flatten_antennas(batch_x[1], batch_y["label"])
+            flattened_x1, flattened_x2 = flattened_x1.to(device), flattened_x2.to(device)
+            torch.cuda.synchronize()
+
+            t2 = time.perf_counter()
+            logits1 = model(flattened_x1)
+            logits2 = model(flattened_x2)
+            loss = loss_fn(logits1, logits2)
+            torch.cuda.synchronize()
+            forward_time = time.perf_counter() - t2
+
+            t3 = time.perf_counter()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            torch.cuda.synchronize()
+            backward_time = time.perf_counter() - t3
+
+            total_loss += loss.item() * flattened_x1.size(0)
+            total_count += flattened_x1.size(0)
+
+            pbar.set_postfix({
+                "loss": f"{loss.item():.4f}",
+                "data(s)": f"{data_time:.2f}",
+                "fwd(s)": f"{forward_time:.2f}",
+                "bwd(s)": f"{backward_time:.2f}"
+            })
+            t0 = time.perf_counter()
+
+    return total_loss / total_count
+
+def evaluate_encoder(model, val_loader, loss_fn, device):
+    total_loss=0
+
+    model.eval()
+    with torch.no_grad():
+        tqdm(val_loader, desc="Validation", leave=False)
+        for inputs, _ in val_loader:
+            batch_size, Nant, Nw, ND = inputs[0].shape
+            inputs_flat_1 = inputs[0].view(batch_size * Nant, 1, Nw, ND).to(device)
+            inputs_flat_2 = inputs[1].view(batch_size * Nant, 1, Nw, ND).to(device)
+
+            logits_flat_1=model(inputs_flat_1)
+            logits_flat_2=model(inputs_flat_2)
+
+            loss = loss_fn(logits_flat_1, logits_flat_2)
+            total_loss += loss.item()
+    avg_loss = total_loss / len(val_loader)
+    return avg_loss
+
+
+
+'''
+self.reduction_conv = nn.Conv2d(self.feature_extractor.out_channels, reduced_channels, kernel_size=1)
+self.relu = nn.ReLU(inplace=True)
+self.dropout = nn.Dropout(p=dropout_rate)
+pooled_nw, pooled_nd = nw // 2, nd // 2
+self.classifier_head = nn.Linear(reduced_channels * pooled_nw * pooled_nd, n_classes)
+'''
