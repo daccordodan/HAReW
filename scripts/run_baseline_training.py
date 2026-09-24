@@ -38,10 +38,6 @@ def main(config_path: str) -> None:
     """
     device = get_device()
 
-    # Disable MIOpen to bypass the broken backward convolution kernels 
-    # and force native rocBLAS math instead
-    torch.backends.cudnn.enabled = False
-
     config = load_config(config_path)
     torch_num_threads = config["local_hardware"].get("torch_num_threads")
     torch_num_interop_threads = config["local_hardware"].get("torch_num_interop_threads")
