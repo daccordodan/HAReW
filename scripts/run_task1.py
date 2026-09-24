@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from src.tasks.task1_cross_subject.contrastive_encoder import ContrastiveEncoder, evaluate_encoder, train_contrastive_pretraining, freeze
+from src.tasks.task1_cross_subject.contrastive_encoder import ContrastiveEncoder, FineTunedModel, evaluate_encoder, train_contrastive_pretraining, freeze
 from src.models.transform import dopplerTraceTransformation
 from src.models.losses import NTXentLoss
 from src.data.label_mapping import TARGET_CLASSES
@@ -99,7 +99,7 @@ def main(config_path: str, local: bool = False) -> None:
     train_loader,val_loader=get_data_loaders(logger, config, "S1", transform)
 
     classifier = nn.Linear(contrastive_enc.reduced_channels * contrastive_enc.pooled_nw * contrastive_enc.pooled_nd, n_classes)
-    HAReW_model= nn.Sequential(
+    HAReW_model= FineTunedModel(
         contrastive_enc,
         classifier
     )
@@ -165,7 +165,6 @@ def run_epoch(
 
     with context:
         for batch_x, batch_y in dataloader:
-            print(type(batch_x[0]))
             flattened_x1, flattened_y = flatten_antennas(batch_x[0], batch_y["label"])
             flattened_x2, _ = flatten_antennas(batch_x[1], batch_y["label"])
             flattened_x1, flattened_x2, flattened_y = flattened_x1.to(device), flattened_x2.to(device), flattened_y.to(device)

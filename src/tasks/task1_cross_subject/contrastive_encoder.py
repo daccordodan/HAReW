@@ -34,6 +34,15 @@ from tqdm import tqdm
 
 from src.models.inception_module import SimplifiedInceptionModule
 
+class FineTunedModel(nn.Module):
+    def __init__(self, encoder, classifier):
+        super().__init__()
+        self.encoder = encoder
+        self.classifier = classifier
+        
+    def forward(self, doppler_trace):
+        features = self.encoder(doppler_trace, extract_features=True)
+        return self.classifier(features)
 
 class ContrastiveEncoder(nn.Module):
     """Encoder used for contrastive pretraining on Doppler traces.
@@ -50,7 +59,9 @@ class ContrastiveEncoder(nn.Module):
         nd: int = 100,
         reduced_channels: int = 3,
         dropout_rate: float = 0.2,
-        projection_dim: int = 128
+        projection_dim: int = 128,
+        hidden_dim: int = 1024,
+        extract_features: bool = False
     ) -> None:
         """Initializes the classifier.
 
@@ -62,6 +73,7 @@ class ContrastiveEncoder(nn.Module):
             dropout_rate: Dropout probability before the final dense layer.
         """
         super().__init__()
+        self.extract_features = extract_features
         self.feature_extractor = SimplifiedInceptionModule(in_channels=1)
         self.reduction_conv = nn.Conv2d(self.feature_extractor.out_channels, reduced_channels, kernel_size=1)
         self.relu = nn.ReLU(inplace=True)
@@ -71,7 +83,7 @@ class ContrastiveEncoder(nn.Module):
         self.pooled_nw, self.pooled_nd = nw // 2, nd // 2
 
         self.projector = nn.Sequential(
-            nn.Linear(reduced_channels * self.pooled_nw * self.pooled_nd, reduced_channels * self.pooled_nw * self.pooled_nd),
+            nn.Linear(reduced_channels * self.pooled_nw * self.pooled_nd, hidden_dim),
             nn.ReLU(),
             nn.Linear(reduced_channels * self.pooled_nw * self.pooled_nd, projection_dim)
         )
@@ -91,6 +103,10 @@ class ContrastiveEncoder(nn.Module):
         reduced = self.relu(self.reduction_conv(features))  # (batch, 3, Nw/2, ND/2)
         flattened = torch.flatten(reduced, start_dim=1)
         dropped = self.dropout(flattened)
+
+        if self.extract_features:
+            return dropped
+
         return self.projector(dropped)
 
     def count_parameters(self) -> int:
@@ -137,21 +153,20 @@ def train_contrastive_pretraining(
 
     with context:
         for batch_x, batch_y in dataloader:
-            print(type(batch_x[0]))
-            flattened_x1, flattened_y = flatten_antennas(batch_x[0], batch_y["label"])
+            flattened_x1, _ = flatten_antennas(batch_x[0], batch_y["label"])
             flattened_x2, _ = flatten_antennas(batch_x[1], batch_y["label"])
-            flattened_x1, flattened_x2, flattened_y = flattened_x1.to(device), flattened_x2.to(device), flattened_y.to(device)
+            flattened_x1, flattened_x2 = flattened_x1.to(device), flattened_x2.to(device)
 
             logits1 = model(flattened_x1)
             logits2 = model(flattened_x2)
-            loss = loss_fn(logits1, logits2, flattened_y)
+            loss = loss_fn(logits1, logits2)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            total_loss += loss.item() * flattened_y.size(0)
-            total_count += flattened_y.size(0)
+            total_loss += loss.item() * flattened_x1.size(0)
+            total_count += flattened_x1.size(0)
 
     return total_loss / total_count
 

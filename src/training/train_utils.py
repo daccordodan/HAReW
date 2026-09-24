@@ -95,7 +95,7 @@ def load_checkpoint(model, optimizer, config, checkpoint_path, local=False):
         try:
             checkpoint = torch.load(hf_hub_download(
                 repo_id="danieledaccordo/HAReW",
-                filename="checkpoints_dir/sharp_baseline_best.pt",
+                filename="checkpoints_dir/"+checkpoint_path.name,
                 repo_type="model",
             ), map_location="cpu")
             model.load_state_dict(checkpoint["model_state_dict"])
