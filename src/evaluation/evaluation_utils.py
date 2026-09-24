@@ -13,20 +13,27 @@ from sklearn.metrics import ConfusionMatrixDisplay
 
 from src.data.label_mapping import TARGET_CLASSES
 from src.models.sharp_classifier import SHARPClassifier
-
 from huggingface_hub import hf_hub_download
 
-def load_checkpoint_to_model(config,checkpoint_name,device,logger):
+def load_checkpoint_to_model(config, checkpoint_name, device, logger, local=False):
     model=SHARPClassifier(
         n_classes=len(TARGET_CLASSES),
         nw=config["doppler"]["stacked_vectors_nw"],
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
-    checkpoint = torch.load(hf_hub_download(
-        repo_id="danieledaccordo/HAReW",
-        filename="checkpoints_dir/"+checkpoint_name,
-        repo_type="model"
-    ), map_location=device)
+    if local:
+        checkpoint_path = Path(checkpoint_name)
+        if not checkpoint_path.is_absolute() and not checkpoint_path.exists():
+            checkpoint_path = Path(config["paths"]["baseline_output_dir"]) / "checkpoints" / checkpoint_path
+        if not checkpoint_path.exists():
+            raise FileNotFoundError(f"Local checkpoint not found: {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+    else:
+        checkpoint = torch.load(hf_hub_download(
+            repo_id="danieledaccordo/HAReW",
+            filename="checkpoints_dir/" + checkpoint_name,
+            repo_type="model",
+        ), map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     logger.info("Loaded checkpoint from epoch %d", checkpoint.get("epoch", -1))
     return model

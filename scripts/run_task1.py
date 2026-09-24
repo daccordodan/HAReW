@@ -28,13 +28,12 @@ from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 
 from pathlib import Path
-
 from huggingface_hub import HfApi
 
 logger = get_logger(__name__)
 api = HfApi()
 
-def main(config_path: str) -> None:
+def main(config_path: str, local: bool = False) -> None:
     """Entry point: loads config, builds dataset/model, runs the full training loop.
 
     Args:
@@ -64,7 +63,9 @@ def main(config_path: str) -> None:
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
     train_loader,val_loader=get_data_loaders(logger, config, "S1", transform)
-    start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
+    start_epoch, best_val_acc, history=load_checkpoint(
+        model, optimizer, config, checkpoint_path, local=local
+    )
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         train_loss, train_acc = run_epoch(model, train_loader, loss_fn, device, optimizer)
@@ -81,7 +82,10 @@ def main(config_path: str) -> None:
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            update_checkpoints(logger, api, model, optimizer, config, epoch, val_acc, history, checkpoint_path, checkpoint_name)
+            update_checkpoints(
+                logger, api, model, optimizer, config, epoch, val_acc, history,
+                checkpoint_path, checkpoint_name, local=local
+            )
 
     figure_name="train_validation_over_epoch_t13.png"
     figures_dir = output_root / "figures"
@@ -134,5 +138,6 @@ def run_epoch(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Task 1: cross-subject contrastive pretraining.")
     parser.add_argument("--config", type=str, default="config/task1_cross_subject.yaml")
+    parser.add_argument("--local", action="store_true", help="Use local checkpoint files instead of Hugging Face.")
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, local=args.local)

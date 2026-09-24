@@ -24,13 +24,12 @@ from src.utils.config_loader import load_config
 from src.utils.logger import get_logger
 
 from pathlib import Path
-
 from huggingface_hub import HfApi
 
 logger = get_logger(__name__)
 api = HfApi()
 
-def main(config_path: str) -> None:
+def main(config_path: str, local: bool = False) -> None:
     """Entry point: loads config, builds dataset/model, runs the full training loop.
 
     Args:
@@ -77,7 +76,9 @@ def main(config_path: str) -> None:
     logger.info("Starting dataset parsing and recording loading...")
     train_loader,val_loader=get_data_loaders(logger, config, "S1")
     logger.info("Dataset preparation complete.")
-    start_epoch, best_val_acc, history=load_checkpoint(model, optimizer, config, checkpoint_path)
+    start_epoch, best_val_acc, history=load_checkpoint(
+        model, optimizer, config, checkpoint_path, local=local
+    )
 
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         logger.info("Starting training epoch %d/%d...", epoch, config["training"]["epochs"])
@@ -97,7 +98,10 @@ def main(config_path: str) -> None:
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            update_checkpoints(logger, api, model, optimizer, config, epoch, val_acc, history, checkpoint_path, checkpoint_name)
+            update_checkpoints(
+                logger, api, model, optimizer, config, epoch, val_acc, history,
+                checkpoint_path, checkpoint_name, local=local
+            )
 
     figure_name="train_validation_over_epoch_baseline.png"
     figures_dir = output_root / "figures"
@@ -164,5 +168,6 @@ def run_epoch(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the SHARP baseline.")
     parser.add_argument("--config", type=str, default="config/base_config.yaml")
+    parser.add_argument("--local", action="store_true", help="Use local checkpoint files instead of Hugging Face.")
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, local=args.local)
