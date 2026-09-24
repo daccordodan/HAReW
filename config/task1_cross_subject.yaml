@@ -27,6 +27,11 @@ training:
   pretraining_epochs: 100
   finetune_epochs: 20
 
+model:
+  n_classes_primary: 5          # E, W, R, J, L -- see src/data/label_mapping.py
+  dropout_rate: 0.2
+  reference_param_count: 128535
+
 contrastive:
   projection_dim: 64             # placeholder -- to be tuned during extension phase
   temperature: 0.1                # SimCLR-style contrastive temperature (placeholder)
