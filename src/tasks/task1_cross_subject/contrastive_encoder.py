@@ -93,6 +93,10 @@ class ContrastiveEncoder(nn.Module):
         dropped = self.dropout(flattened)
         return self.projector(dropped)
 
+    def count_parameters(self) -> int:
+            """Returns the total trainable parameter count, for comparison."""
+            return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
 def freeze(model):
     for param in model.feature_extractor.branch_a:
         param.requires_grad = False

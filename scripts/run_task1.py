@@ -41,7 +41,7 @@ def main(config_path: str, local: bool = False) -> None:
     device = get_device()
     config = load_config(config_path)
 
-    n_classes=Path(config["model"]["n_classes_primary"])
+    n_classes=config["model"]["n_classes_primary"]
 
     output_root=Path(config["paths"]["task_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
@@ -52,7 +52,6 @@ def main(config_path: str, local: bool = False) -> None:
     checkpoint_path = checkpoints_dir / checkpoint_name
 
     contrastive_enc = ContrastiveEncoder(
-        n_classes=len(TARGET_CLASSES),
         nw=config["doppler"]["stacked_vectors_nw"],
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
@@ -111,7 +110,7 @@ def main(config_path: str, local: bool = False) -> None:
         HAReW_model, optimizer, config, checkpoint_path, local=local
     )
 
-    for epoch in range(start_epoch, config["training"]["epochs"] + 1):
+    for epoch in range(start_epoch, config["training"]["finetune_epochs"] + 1):
         logger.info("Starting training epoch %d/%d...", epoch, config["training"]["epochs"])
         train_loss, train_acc = run_epoch(
             HAReW_model, train_loader, loss_fn, device, optimizer, logger=logger
@@ -119,7 +118,7 @@ def main(config_path: str, local: bool = False) -> None:
         val_loss, val_acc = evaluate_with_fusion(HAReW_model, val_loader, loss_fn, device)
         logger.info(
             "Epoch %d/%d | train_loss=%.4f train_acc=%.4f | val_loss=%.4f val_acc=%.4f",
-            epoch, config["training"]["epochs"], train_loss, train_acc, val_loss, val_acc,
+            epoch, config["training"]["finetune_epochs"], train_loss, train_acc, val_loss, val_acc,
         )
 
         history["epoch"].append(epoch)
