@@ -84,14 +84,14 @@ def write_report_performances(accuracy_by_set, accuracy_by_set_pa, fscore_by_set
         for set_id, acc in accuracy_by_set.items():
             f.write(f"{set_id}\t{acc:.4f}\n")
 
-    with open(files_dir / "per_set_accuracy.txt", "w", encoding="utf-8") as f:
+    with open(files_dir / "per_set_accuracy_pa.txt", "w", encoding="utf-8") as f:
         for set_id, acts in accuracy_by_set_pa.items():
             f.write(f"{set_id}\n")
-            for act, acc in acts:
+            for act, acc in acts.items():
                 f.write(f"{act}\t{acc:.4f}\n")
 
     with open(files_dir / "per_set_f1.txt", "w", encoding="utf-8") as f:
         for set_id, acts in fscore_by_set_pa.items():
             f.write(f"{set_id}\n")
-            for act, fs in acts:
+            for act, fs in acts.items():
                 f.write(f"{act}\t{fs:.4f}\n")
