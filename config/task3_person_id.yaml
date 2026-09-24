@@ -12,9 +12,8 @@ paths:
   colab_drive_subpath: null
   colab_drive_output_subpath: null
 
-person_id:
-  n_persons: null                  # TODO: confirm against the real dataset drop -- NOT yet known
-  label_source: null               # TODO: confirm how person identity is encoded in your files
+model:
+  n_people: 3
 
 training:
   batch_size: 16
