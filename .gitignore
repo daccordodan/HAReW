@@ -5,3 +5,4 @@ outputs/baseline/checkpoints/*
 outputs/baseline/figures/*
 
 __pycache__/
+notes/
