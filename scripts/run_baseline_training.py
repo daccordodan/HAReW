@@ -52,13 +52,20 @@ def main(config_path: str, local: bool = False) -> None:
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_path = checkpoints_dir / checkpoint_name
 
-    model = SHARPClassifier(
-        n_classes=config["model"]["n_classes_primary"],
-        nw=config["doppler"]["stacked_vectors_nw"],
-        nd=config["doppler"]["velocity_bins_nd"],
-    ).to(device)
+    models = [None] * 4
+    optimizers = [None] * 4
+    for i in range(config["hardware"]["n_antennas"]):
+        models[i] =  SHARPClassifier(
+            n_classes=config["model"]["n_classes_primary"],
+            nw=config["doppler"]["stacked_vectors_nw"],
+            nd=config["doppler"]["velocity_bins_nd"],
+        ).to(device)
+
+        optimizers[i] = torch.optim.Adam(models[i].parameters(), lr=config["training"]["learning_rate"])
+
+
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
+    
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 
