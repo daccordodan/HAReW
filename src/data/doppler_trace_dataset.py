@@ -143,7 +143,7 @@ class DopplerTraceDataset(Dataset):
         self.logger = logger
 
         self._recordings: list[np.ndarray] = []
-        self._window_indices: list[tuple[int, int, int, int, int]] = []
+        self._window_indices: list[tuple[int, int, int, int, int|None]] = []
 
         self._excluded_counts: dict[str, int] = {}
         self._corrupt_files: list[str] = []
@@ -206,7 +206,7 @@ class DopplerTraceDataset(Dataset):
                     for ant in range(self.n_antennas):
                         self._window_indices.append((rec_idx, start_time, class_idx, subject, ant))
                 else:
-                    self._window_indices.append((rec_idx, start_time, class_idx, subject, 0))
+                    self._window_indices.append((rec_idx, start_time, class_idx, subject, None))
 
         if self.logger is not None:
             elapsed = time.perf_counter() - started_at
