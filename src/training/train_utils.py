@@ -73,6 +73,63 @@ def run_epoch(
 
     return total_loss / total_count, total_correct / total_count
 
+def run_independent_epochs(
+    models: list[torch.nn.Module],
+    dataloader: DataLoader,
+    loss_fn: torch.nn.Module,
+    device: str,
+    optimizers: list[torch.optim.Optimizer]
+) -> tuple[float, float]:
+    total_losses, total_corrects = [0.0] * 4, [0] * 4
+    total_counts = 0
+    context = torch.enable_grad()
+
+    for model in models:
+        model.train()
+
+    pbar = tqdm(dataloader, desc="Training", leave=False)
+    t0 = time.perf_counter()
+    
+    with context:
+        for batch_x, batch_y in pbar:
+            data_time = time.perf_counter() - t0
+            
+            # Transfer to GPU
+            batch_x, batch_y["label"] = batch_x.to(device, non_blocking=True), batch_y.to(device, non_blocking=True)
+            # torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
+
+            # Forward Pass
+            for i in range(models):
+                t2 = time.perf_counter()
+                logits = models[i](batch_x[:,i,:,:])
+                loss = loss_fn(logits, batch_y["label"])
+                # torch.cuda.synchronize()
+                forward_time = time.perf_counter() - t2
+
+                # Backward Pass
+                t3 = time.perf_counter()
+                optimizers[i].zero_grad()
+                loss.backward()
+                optimizers[i].step()
+                # torch.cuda.synchronize()
+                backward_time = time.perf_counter() - t3
+
+                total_losses[i] += loss.item() * batch_y["label"].size(0)
+                total_corrects[i] += (logits.argmax(dim=1) == batch_y["label"]).sum().item()
+
+                # Update the progress bar with the live times!
+                pbar.set_postfix({
+                    "loss": f"{loss.item():.4f}",
+                    "data(s)": f"{data_time:.2f}",
+                    "fwd(s)": f"{forward_time:.2f}",
+                    "bwd(s)": f"{backward_time:.2f}"
+                })
+                t0 = time.perf_counter()
+
+            total_counts += batch_y["label"].size(0)
+
+    return total_losses / total_counts, total_corrects / total_counts
+
 def flatten_antennas(batch_x: torch.Tensor, batch_y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """Reshapes a (batch, Nant, Nw, ND) batch into (batch*Nant, 1, Nw, ND).
 
@@ -121,6 +178,50 @@ def evaluate_with_fusion(model, val_loader, loss_fn, device):
             total_samples += batch_size
 
     avg_loss = total_loss / len(val_loader)
+    fused_acc = correct_fused / total_samples
+    
+    return avg_loss, fused_acc
+
+
+def evaluate_with_fusion_independent(models, val_loader, loss_fn, device):
+    """
+    Evaluates the model using the SHARP Decision strategy.
+    """
+    for model in models:
+        model.eval()
+    
+    n_models = len(models)
+    if n_models == 0:
+        raise ValueError("models must contain at least one model")
+
+    total_loss = [0.0] * n_models
+    correct_fused = 0
+    total_samples = 0
+
+    with torch.no_grad():
+        pbar = tqdm(val_loader, desc="Validation", leave=False)
+        for inputs, targets in pbar:
+            batch_size, Nant, Nw, ND = inputs.shape
+
+            inputs = inputs.to(device, non_blocking=True)
+            labels = targets["label"].to(device, non_blocking=True)
+            per_antenna_probabilities = []
+
+            for i, model in enumerate(models):
+                antenna_input = inputs[:, i, :, :].unsqueeze(1)
+                logits = model(antenna_input)
+                loss = loss_fn(logits, labels)
+                total_loss[i] += loss.item() * batch_size
+                per_antenna_probabilities.append(softmax(logits, dim=1))
+
+            probabilities = torch.stack(per_antenna_probabilities, dim=1)
+            fused_preds = fuse_batch(probabilities.cpu(), n_antennas=n_models)
+
+            targets_cpu = targets["label"].cpu()
+            correct_fused += (fused_preds == targets_cpu).sum().item()
+            total_samples += batch_size
+
+    avg_loss = sum(total_loss) / (total_samples * n_models)
     fused_acc = correct_fused / total_samples
     
     return avg_loss, fused_acc
