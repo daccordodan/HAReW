@@ -143,7 +143,7 @@ class DopplerTraceDataset(Dataset):
         self.logger = logger
 
         self._recordings: list[np.ndarray] = []
-        self._window_indices: list[tuple[int, int, int]] = []
+        self._window_indices: list[tuple[int, int, int, int]] = []
 
         self._excluded_counts: dict[str, int] = {}
         self._corrupt_files: list[str] = []
@@ -255,6 +255,8 @@ class DopplerTraceDataset(Dataset):
                 return val_start, val_end
             elif self.temporal_split == "test":
                 return test_start, min_len
+            else:
+                return 0, 0
         else:
             return 0, min_len
 
