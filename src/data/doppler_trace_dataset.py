@@ -229,11 +229,11 @@ class DopplerTraceDataset(Dataset):
         end_time = start_time + self.window_size
 
         # If antenna_idx is specified (training), slice to shape (1, Nw, ND)
-        if antenna_idx is not None:
-            window = self._recordings[rec_idx][antenna_idx : antenna_idx + 1, start_time:end_time, :]
-        # If antenna_idx is None (validation/test), return all antennas for fusion (4, Nw, ND)
-        else:
-            window = self._recordings[rec_idx][:, start_time:end_time, :]
+        # if antenna_idx is not None:
+        #     window = self._recordings[rec_idx][antenna_idx : antenna_idx + 1, start_time:end_time, :]
+        # # If antenna_idx is None (validation/test), return all antennas for fusion (4, Nw, ND)
+        # else:
+        window = self._recordings[rec_idx][:, start_time:end_time, :]
 
         if self.transform is not None:
             sample1 = self.transform(window)

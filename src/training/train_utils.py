@@ -95,13 +95,13 @@ def run_independent_epochs(
             data_time = time.perf_counter() - t0
             
             # Transfer to GPU
-            batch_x, batch_y["label"] = batch_x.to(device, non_blocking=True), batch_y.to(device, non_blocking=True)
+            batch_x, batch_y["label"] = batch_x.to(device, non_blocking=True), batch_y["labels"].to(device, non_blocking=True)
             # torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
 
             # Forward Pass
-            for i in range(models):
+            for i in range(len(models)):
                 t2 = time.perf_counter()
-                logits = models[i](batch_x[:,i,:,:])
+                logits = models[i](batch_x[:,i,:,:].unsqueeze(1))
                 loss = loss_fn(logits, batch_y["label"])
                 # torch.cuda.synchronize()
                 forward_time = time.perf_counter() - t2
