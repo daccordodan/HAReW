@@ -58,7 +58,7 @@ def main(config_path: str, local: bool = False) -> None:
         nd=config["doppler"]["velocity_bins_nd"],
     ).to(device)
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"]) # fused?
+    optimizer = torch.optim.Adam(model.parameters(), lr=config["training"]["learning_rate"])
 
     logger.info("Model parameter count: %d (paper reference: 128,535)", model.count_parameters())
 

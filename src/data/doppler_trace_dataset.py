@@ -51,7 +51,7 @@ class StreamFileInfo:
     activity_code: str
     antenna_idx: int
 
-def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
+def discover_stream_files(root_dir: Path) -> list[StreamFileInfo]:
     """Parses every matching stream file in root_dir.
 
     Args:
@@ -61,10 +61,9 @@ def discover_stream_files(root_dir: str | Path) -> list[StreamFileInfo]:
         List of StreamFileInfo for every recognized file.
     """
 
-    root = Path(root_dir)
     infos = []
 
-    for txt_path in sorted(root.rglob("*.txt")):
+    for txt_path in sorted(root_dir.rglob("*.txt")):
         match = _FILENAME_RE.match(txt_path.name)
         if match is not None:
             info = StreamFileInfo(
@@ -145,13 +144,11 @@ class DopplerTraceDataset(Dataset):
         self._recordings: list[np.ndarray] = []
         self._window_indices: list[tuple[int, int, int, int, int|None]] = []
 
-        self._excluded_counts: dict[str, int] = {}
-        self._corrupt_files: list[str] = []
-
         self._build_index()
 
     def _build_index(self) -> None:
         started_at = time.perf_counter()
+
         if self.logger is not None:
             self.logger.info(
                 "Parsing %s dataset files for sets=%s (split=%s)...",
@@ -166,9 +163,6 @@ class DopplerTraceDataset(Dataset):
             if info.set_id not in self.sets_to_include:
                 continue
             if not is_in_scope(info.activity_code):
-                self._excluded_counts[info.activity_code] = (
-                    self._excluded_counts.get(info.activity_code, 0) + 1
-                )
                 continue
             key = (info.set_id, info.repetition, info.activity_code)
             groups.setdefault(key, {})[info.antenna_idx] = info.path
@@ -248,18 +242,18 @@ class DopplerTraceDataset(Dataset):
         
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 
-    def evaluate_temp_split(self,min_len) -> tuple[int, int]:
+    def evaluate_temp_split(self,max_len) -> tuple[int, int]:
         """Evaluates the starting and ending index for the requested sets.
 
         Args:
-            min_len: Length of the shortest window.
+            max_len: Maximum length of the window.
         """
         if self.temporal_split != "all":
             gap = self.window_size 
 
-            train_end = int(min_len * 0.6)
+            train_end = int(max_len * 0.6)
             val_start = train_end + gap
-            val_end = val_start + int(min_len * 0.2)
+            val_end = val_start + int(max_len * 0.2)
             test_start = val_end + gap
 
             if self.temporal_split == "train":
@@ -267,11 +261,11 @@ class DopplerTraceDataset(Dataset):
             elif self.temporal_split == "val":
                 return val_start, val_end
             elif self.temporal_split == "test":
-                return test_start, min_len
+                return test_start, max_len
             else:
                 return 0, 0
         else:
-            return 0, min_len
+            return 0, max_len
 
 def build_train_val_split(
     root_dir: str | Path,
