@@ -178,7 +178,7 @@ def get_data_loaders(logger, config, set_id, transform=None):
         Path(config["paths"]["doppler_traces_dir"]),
         set_id,
         window_size=config["doppler"]["stacked_vectors_nw"],
-        stride=config["doppler"].get("window_stride"),
+        stride=config["doppler"]["window_stride"],
         n_antennas=config["hardware"]["n_antennas"],
         logger=logger,
         transform=transform
