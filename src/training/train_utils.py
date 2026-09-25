@@ -41,13 +41,13 @@ def run_epoch(
             # Transfer to GPU
             flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
             flattened_x, flattened_y = flattened_x.to(device, non_blocking=True), flattened_y.to(device, non_blocking=True)
-            torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
+            # torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
 
             # Forward Pass
             t2 = time.perf_counter()
             logits = model(flattened_x)
             loss = loss_fn(logits, flattened_y)
-            torch.cuda.synchronize()
+            # torch.cuda.synchronize()
             forward_time = time.perf_counter() - t2
 
             # Backward Pass
@@ -55,7 +55,7 @@ def run_epoch(
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            torch.cuda.synchronize()
+            # torch.cuda.synchronize()
             backward_time = time.perf_counter() - t3
 
             total_loss += loss.item() * flattened_y.size(0)
@@ -164,18 +164,14 @@ def load_checkpoint(model, optimizer, config, checkpoint_path, local=False):
     return epoch, val_acc, history
 
 def get_data_loaders(logger, config, set_id, transform=None):
-    loader_config = config["local_hardware"]
-    num_workers = int(loader_config.get("num_workers", 0))
-    pin_memory = bool(loader_config.get("pin_memory", False))
-    persistent_workers = bool(
-        loader_config.get("persistent_workers", False) and num_workers > 0
-    )
+    hw_config = config.get("hardware", {})
+    num_workers = int(hw_config.get("num_workers", 2))
+    pin_memory = bool(hw_config.get("pin_memory", True))
+    persistent_workers = bool(hw_config.get("persistent_workers", True) and num_workers > 0)
+
     logger.info(
-        "Preparing data loaders: workers=%d (host CPUs=%d), pin_memory=%s, persistent_workers=%s",
-        num_workers,
-        cpu_count(),
-        pin_memory,
-        persistent_workers,
+        "Preparing data loaders: workers=%d, pin_memory=%s, persistent_workers=%s",
+        num_workers, pin_memory, persistent_workers
     )
 
     _, train_subset, val_subset, _ = build_train_val_split(
@@ -185,9 +181,8 @@ def get_data_loaders(logger, config, set_id, transform=None):
         stride=config["doppler"].get("window_stride"),
         n_antennas=config["hardware"]["n_antennas"],
         logger=logger,
-        transform = transform
+        transform=transform
     )
-    logger.info("Train samples: %d | Val samples: %d", len(train_subset), len(val_subset))
 
     train_loader = DataLoader(
         train_subset,
@@ -206,9 +201,6 @@ def get_data_loaders(logger, config, set_id, transform=None):
         persistent_workers=persistent_workers,
     )
 
-    logger.info(
-        "Data loaders ready. Window tensors will be created lazily as batches are requested."
-    )
     return train_loader, val_loader
 
 def update_checkpoints(

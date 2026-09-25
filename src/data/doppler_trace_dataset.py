@@ -143,7 +143,7 @@ class DopplerTraceDataset(Dataset):
         self.logger = logger
 
         self._recordings: list[np.ndarray] = []
-        self._window_indices: list[tuple[int, int, int, int]] = []
+        self._window_indices: list[tuple[int, int, int, int, int|None]] = []
 
         self._excluded_counts: dict[str, int] = {}
         self._corrupt_files: list[str] = []
@@ -198,7 +198,15 @@ class DopplerTraceDataset(Dataset):
 
             for w in range(n_windows):
                 start_time = w * self.stride
-                self._window_indices.append((rec_idx, start_time, class_idx, subject))
+                
+                # DECOUPLING LOGIC:
+                # If training, register each of the 4 antennas as a completely independent sample.
+                # If evaluating, register them as a single fused block (antenna_idx = None).
+                if self.temporal_split == "train":
+                    for ant in range(self.n_antennas):
+                        self._window_indices.append((rec_idx, start_time, class_idx, subject, ant))
+                else:
+                    self._window_indices.append((rec_idx, start_time, class_idx, subject, None))
 
         if self.logger is not None:
             elapsed = time.perf_counter() - started_at
@@ -223,15 +231,20 @@ class DopplerTraceDataset(Dataset):
             doppler_trace: PyTorch tensor.
             label: Integer target class index.
         """
-        rec_idx, start_time, label, subject = self._window_indices[idx]
+        rec_idx, start_time, label, subject, antenna_idx = self._window_indices[idx]
         end_time = start_time + self.window_size
 
-        window = self._recordings[rec_idx][:, start_time:end_time, :]
+        # If antenna_idx is specified (training), slice to shape (1, Nw, ND)
+        if antenna_idx is not None:
+            window = self._recordings[rec_idx][antenna_idx : antenna_idx + 1, start_time:end_time, :]
+        # If antenna_idx is None (validation/test), return all antennas for fusion (4, Nw, ND)
+        else:
+            window = self._recordings[rec_idx][:, start_time:end_time, :]
 
         if self.transform is not None:
             sample1 = self.transform(window)
             sample2 = self.transform(window)
-            return (torch.tensor(sample1, dtype=torch.float32),torch.tensor(sample2, dtype=torch.float32)), {"label": label, "subject": subject}
+            return (torch.tensor(sample1, dtype=torch.float32), torch.tensor(sample2, dtype=torch.float32)), {"label": label, "subject": subject}
         
         return torch.tensor(window, dtype=torch.float32), {"label": label, "subject": subject}
 

@@ -31,18 +31,18 @@ def main(config_path: str, local: bool = False) -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     config = load_config(config_path)
-    torch_num_threads = config["local_hardware"].get("torch_num_threads")
-    torch_num_interop_threads = config["local_hardware"].get("torch_num_interop_threads")
-    if torch_num_threads is not None:
-        torch.set_num_threads(int(torch_num_threads))
-    if torch_num_interop_threads is not None:
-        torch.set_num_interop_threads(int(torch_num_interop_threads))
-    logger.info(
-        "Using device=%s | torch threads=%d | interop threads=%d",
-        device,
-        torch.get_num_threads(),
-        torch.get_num_interop_threads(),
-    )
+    # torch_num_threads = config["local_hardware"].get("torch_num_threads")
+    # torch_num_interop_threads = config["local_hardware"].get("torch_num_interop_threads")
+    # if torch_num_threads is not None:
+    #     torch.set_num_threads(int(torch_num_threads))
+    # if torch_num_interop_threads is not None:
+    #     torch.set_num_interop_threads(int(torch_num_interop_threads))
+    # logger.info(
+    #     "Using device=%s | torch threads=%d | interop threads=%d",
+    #     device,
+    #     torch.get_num_threads(),
+    #     torch.get_num_interop_threads(),
+    # )
 
     output_root=Path(config["paths"]["baseline_output_dir"])
     output_root.mkdir(parents=True, exist_ok=True)
