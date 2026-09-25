@@ -13,7 +13,10 @@ paths:
 
 hardware:
   n_antennas: 4                # Physical monitor antennas in the recordings
-
+  num_workers: 2               # Colab has 2 vCPUs; 2 workers maximizes overlap without contention
+  pin_memory: true             # Fast pinned host-to-device transfers on CUDA
+  persistent_workers: true     # Prevents worker recreation overhead between epochs
+  
 local_hardware:                # Local GPU parameters
   num_workers: 0
   pin_memory: true
