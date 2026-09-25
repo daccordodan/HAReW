@@ -21,7 +21,7 @@ from huggingface_hub.errors import EntryNotFoundError
 import matplotlib.pyplot as plt
 
 def run_epoch(
-    models: list[torch.nn.Module],
+    model: torch.nn.Module,
     dataloader: DataLoader,
     loss_fn: torch.nn.Module,
     device: str,
@@ -39,12 +39,13 @@ def run_epoch(
             data_time = time.perf_counter() - t0
             
             # Transfer to GPU
-            batch_x, batch_y["label"] = batch_x.to(device, non_blocking=True), batch_y.to(device, non_blocking=True)
+            flattened_x, flattened_y = flatten_antennas(batch_x, batch_y["label"])
+            flattened_x, flattened_y = flattened_x.to(device, non_blocking=True), flattened_y.to(device, non_blocking=True)
             # torch.cuda.synchronize()  # Force CPU to wait for GPU transfer
 
             # Forward Pass
             t2 = time.perf_counter()
-            logits = model(batch_x[:,0,:,:])
+            logits = model(flattened_x)
             loss = loss_fn(logits, flattened_y)
             # torch.cuda.synchronize()
             forward_time = time.perf_counter() - t2
