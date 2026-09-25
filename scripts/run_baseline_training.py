@@ -14,9 +14,7 @@ from torch import nn
 
 from src.models.sharp_classifier import SHARPClassifier
 from src.training.train_utils import run_epoch, evaluate_with_fusion, load_checkpoint, get_data_loaders, update_checkpoints, plot_train_val_history
-from src.utils.colab_utils import get_device
-from src.utils.config_loader import load_config
-from src.utils.logger import get_logger
+from src.utils.utils import load_config, get_logger
 
 from pathlib import Path
 from huggingface_hub import HfApi
@@ -30,7 +28,7 @@ def main(config_path: str, local: bool = False) -> None:
     Args:
         config_path: Path to config/base_config.yaml.
     """
-    device = get_device()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     config = load_config(config_path)
     torch_num_threads = config["local_hardware"].get("torch_num_threads")

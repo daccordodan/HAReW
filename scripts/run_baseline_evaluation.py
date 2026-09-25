@@ -19,9 +19,7 @@ import numpy as np
 from src.data.label_mapping import TARGET_CLASSES
 from src.data.doppler_trace_dataset import build_train_val_split, build_zero_shot_test_set
 from src.evaluation.metrics import compute_accuracy_per_activity, compute_confusion_matrix, compute_f1_per_activity
-from src.utils.colab_utils import get_device
-from src.utils.config_loader import load_config
-from src.utils.logger import get_logger
+from src.utils.utils import load_config, get_logger
 from src.evaluation.evaluation_utils import load_checkpoint_to_model, plot_acc_f1_results_pa, plot_conf_mat_results_pa, write_report_performances
 from src.models.decision_fusion import fuse_batch
 
@@ -36,7 +34,7 @@ def main(config_path: str, checkpoint_name: str, local: bool = False) -> None:
         config_path: Path to configs.
         checkpoint_name: File name of the checkpoint saved on Hugging Face.
     """
-    device = get_device()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     config = load_config(config_path)
     model=SHARPClassifier(
         n_classes=len(TARGET_CLASSES),
